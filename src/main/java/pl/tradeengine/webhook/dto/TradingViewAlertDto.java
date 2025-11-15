@@ -7,7 +7,7 @@ import pl.tradeengine.alerts.domain.SignalType;
 
 public record TradingViewAlertDto(
         @NotBlank String symbol,
-        @NotBlank String interval,
+        @NotBlank String timeframe,
         @NotNull SignalType signalType,
         @NotNull Direction direction
 ) {}
