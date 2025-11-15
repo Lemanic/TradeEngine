@@ -1,0 +1,10 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/tradeengine
+    driver-class-name: org.postgresql.Driver
+    username: postgres
+    password: twojehaslo
+  jpa:
+    hibernate:
+      ddl-auto: validate   # produkcja: tylko sprawdź zgodność encji, nie twórz/fill tabele
+    show-sql: false

@@ -1,0 +1,8 @@
+spring:
+  application:
+    version: "1.0.1"
+  profiles:
+    active: dev
+logging:
+  level:
+    root: INFO

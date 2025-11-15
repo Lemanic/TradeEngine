@@ -9,6 +9,5 @@ public record TradingViewAlertDto(
         @NotBlank String symbol,
         @NotBlank String interval,
         @NotNull SignalType signalType,
-        @NotNull Direction direction,
-        @NotNull Double strength
+        @NotNull Direction direction
 ) {}
