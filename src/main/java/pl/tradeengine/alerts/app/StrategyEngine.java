@@ -69,7 +69,7 @@ public class StrategyEngine {
         System.out.println();
 
         if (highestStrengthFvg.isPresent()) {
-            System.out.println("chyba coś mamy");
+            System.out.println("div siła: " + alert.strength() + "fvg siła:" + highestStrengthFvg.get().getStrength());
         }
 
 //        if (alert.strength() >= 3.0) {
