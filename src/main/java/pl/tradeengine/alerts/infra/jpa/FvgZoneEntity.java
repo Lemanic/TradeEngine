@@ -46,4 +46,7 @@ public class FvgZoneEntity {
         this.status = status;
     }
 
+    public FvgStatus getStatus() {
+        return status;
+    }
 }
