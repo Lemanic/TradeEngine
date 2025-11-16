@@ -6,5 +6,6 @@ public enum SignalType {
     FVG_TOUCHED,
     FVG_FILLED,
     IFVG_CREATED,
-    IFVG_TOUCHED
+    IFVG_TOUCHED,
+    IFVG_FILLED
 }

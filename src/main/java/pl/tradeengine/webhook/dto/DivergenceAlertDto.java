@@ -5,7 +5,7 @@ import org.jetbrains.annotations.NotNull;
 import pl.tradeengine.alerts.domain.Direction;
 import pl.tradeengine.alerts.domain.SignalType;
 
-public record TradingViewAlertDto(
+public record DivergenceAlertDto(
         @NotBlank String symbol,
         @NotBlank String timeframe,
         @NotNull SignalType signalType,

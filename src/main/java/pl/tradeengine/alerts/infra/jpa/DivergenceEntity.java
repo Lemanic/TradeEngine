@@ -3,13 +3,16 @@ package pl.tradeengine.alerts.infra.jpa;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.jetbrains.annotations.NotNull;
 import pl.tradeengine.alerts.domain.Direction;
+
+import java.time.Instant;
 
 @Getter
 @Setter
 @Entity
-@Table(name = "fvg_zone")
-public class FvgZoneEntity {
+@Table(name = "divergences")
+public class DivergenceEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,28 +25,20 @@ public class FvgZoneEntity {
     @Enumerated(EnumType.STRING)
     private Direction direction;
 
+    @NotNull
     private double strength;
 
-    private double fvgLow;
+    private Instant timestamp;
 
-    private double fvgHigh;
+    // Konstruktor, gettery, settery
 
-    private boolean active = true;
+    protected DivergenceEntity() {}
 
-    @Enumerated(EnumType.STRING)
-    private FvgStatus status = FvgStatus.CREATED;
-
-    protected FvgZoneEntity() {}
-
-    public FvgZoneEntity(String symbol, String timeframe, Direction direction, double strength, double fvgLow, double fvgHigh, FvgStatus status) {
+    public DivergenceEntity(String symbol, String timeframe, Direction direction, double strength, Instant timestamp) {
         this.symbol = symbol;
         this.timeframe = timeframe;
         this.direction = direction;
         this.strength = strength;
-        this.fvgLow = fvgLow;
-        this.fvgHigh = fvgHigh;
-        this.active = true;
-        this.status = status;
+        this.timestamp = timestamp;
     }
-
 }
