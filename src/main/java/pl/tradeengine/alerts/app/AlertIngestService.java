@@ -5,7 +5,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import pl.tradeengine.alerts.domain.Direction;
 import pl.tradeengine.alerts.domain.IncomingAlert;
-import pl.tradeengine.alerts.domain.SignalType;
 import pl.tradeengine.alerts.infra.jpa.FvgStatus;
 import pl.tradeengine.alerts.infra.jpa.FvgZoneEntity;
 import pl.tradeengine.alerts.infra.jpa.FvgZoneRepository;
@@ -28,7 +27,7 @@ public class AlertIngestService {
     }
 
     public void handleDivergence(DivergenceAlertDto dto) {
-        double strength = computeStrengthFromInterval(dto.timeframe(), dto.signalType());
+        double strength = computeDivergenceStrength(dto.timeframe());
 
         IncomingAlert alert = new IncomingAlert(
                 dto.symbol(),
@@ -44,11 +43,14 @@ public class AlertIngestService {
     }
 
     public void handleFvgCreate(FvgAlertDto dto) {
+//        double strength = computeDivergenceStrength(dto.timeframe());
+        double strength = computeFvgStrength(dto.timeframe());
+
         FvgZoneEntity entity = new FvgZoneEntity(
                 dto.symbol(),
                 dto.timeframe(),
                 dto.direction(),
-                dto.strength(),
+                strength,
                 dto.fvgLow(),
                 dto.fvgHigh(),
                 dto.fvgStatus()
@@ -69,7 +71,6 @@ public class AlertIngestService {
             boolean isTouched = dto.currentHigh() >= fvg.getFvgLow() && dto.currentLow() <= fvg.getFvgHigh();
             boolean isFilled = false;
 
-            // Przykład warunku fill dla LONG i SHORT (dostosuj wg strategii)
             if (fvg.getDirection() == Direction.LONG) {
                 isFilled = dto.currentLow() < fvg.getFvgLow();
             } else if (fvg.getDirection() == Direction.SHORT) {
@@ -79,6 +80,10 @@ public class AlertIngestService {
             if (isFilled && fvg.isActive()) {
                 fvg.setStatus(FvgStatus.FILLED);
                 fvg.setActive(false);
+
+                double increasedStrength = fvg.getStrength() * 1.5;
+                fvg.setStrength(increasedStrength);
+
                 fvgZoneRepository.save(fvg);
                 log.info("FVG filled for symbol {} at range [{}, {}]", fvg.getSymbol(), fvg.getFvgLow(), fvg.getFvgHigh());
             } else if (isTouched && fvg.isActive() && fvg.getStatus() == FvgStatus.CREATED) {
@@ -89,9 +94,7 @@ public class AlertIngestService {
         }
     }
 
-
-
-    private double computeStrengthFromInterval(String timeframe, SignalType type) {
+    private double computeDivergenceStrength(String timeframe) {
         return switch (timeframe) {
             case "M5"  -> 1.0;
             case "M15" -> 2.0;
@@ -100,6 +103,17 @@ public class AlertIngestService {
             case "H12" -> 5.0;
             case "D1"  -> 6.0;
             case "D2" -> 7.0;
+            case "W1"  -> 8.0;
+            default    -> 0.0;
+        };
+    }
+
+    private double computeFvgStrength(String timeframe) {
+        return switch (timeframe) {
+            case "H1"  -> 1.5;
+            case "H4"  -> 3.5;
+            case "H12" -> 4.0;
+            case "D1"  -> 5;
             case "W1"  -> 8.0;
             default    -> 0.0;
         };

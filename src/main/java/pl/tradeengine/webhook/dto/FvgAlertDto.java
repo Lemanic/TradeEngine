@@ -11,7 +11,6 @@ public record FvgAlertDto(
         @NotBlank String timeframe,
         @NotNull SignalType signalType,
         @NotNull Direction direction,
-        @NotNull Double strength,
         @NotNull Double fvgLow,
         @NotNull Double fvgHigh,
         @NotNull FvgStatus fvgStatus

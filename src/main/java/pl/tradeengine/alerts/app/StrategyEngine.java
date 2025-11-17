@@ -30,54 +30,25 @@ public class StrategyEngine {
             return;
         }
 
-        // niech sprawdza czy to jest najwyższy fvg?
-//        List<FvgZoneEntity> fvgs = fvgZoneRepository.findBySymbol(alert.symbol());
-        // tutaj posortować?
-
-
-        System.out.println();
-        FvgZoneEntity highestFvg;
-
-//        Map<String, Optional<FvgZoneEntity>> highestFvgByTimeframe = fvgs.stream()
-//                .collect(Collectors.groupingBy(
-//                        FvgZoneEntity::getTimeframe,
-//                        Collectors.maxBy(Comparator.comparingDouble(FvgZoneEntity::getFvgHigh))
-//                ));
-
-//        Optional<FvgZoneEntity> highestStrengthFvg = highestFvgByTimeframe.values().stream()
-//                .filter(Optional::isPresent)
-//                .map(Optional::get)
-//                .filter(fvg -> fvg.getStatus() != FvgStatus.CREATED) // tylko status TOUCH lub FILLED
-//                .max(Comparator.comparingDouble(FvgZoneEntity::getStrength)); // szukamy max strength
-
         List<FvgZoneEntity> fvgs = fvgZoneRepository.findBySymbol(alert.symbol());
 
-        // Grupowanie po timeframe, wybór FVG o najwyższym fvgHigh dla każdego TF
         Map<String, Optional<FvgZoneEntity>> highestFvgByTimeframe = fvgs.stream()
                 .collect(Collectors.groupingBy(
                         FvgZoneEntity::getTimeframe,
                         Collectors.maxBy(Comparator.comparingDouble(FvgZoneEntity::getFvgHigh))
                 ));
 
-        // Znajdź spośród tych najwyższych FVG taki, który ma najwyższą strength i status różny od CREATED
         Optional<FvgZoneEntity> highestStrengthFvg = highestFvgByTimeframe.values().stream()
                 .filter(Optional::isPresent)
                 .map(Optional::get)
                 .filter(fvg -> fvg.getStatus() != FvgStatus.CREATED)
                 .max(Comparator.comparingDouble(FvgZoneEntity::getStrength));
 
-        System.out.println();
-
         if (highestStrengthFvg.isPresent()) {
+            // filled /= touch siła
             System.out.println("div siła: " + alert.strength() + "fvg siła:" + highestStrengthFvg.get().getStrength());
         }
 
-//        if (alert.strength() >= 3.0) {
-            log.info("DIVERGENCE signal accepted by StrategyEngine: {}", alert);
-//            // TODO: tu w przyszłości: zapis decyzji, powiadomienie, integracja z FVG, itp.
-//        } else {
-//            log.info("DIVERGENCE signal ignored (too weak): {}", alert);
-////            log.debug("DIVERGENCE signal ignored (too weak): {}", alert);
-//        }
+        log.info("DIVERGENCE signal accepted by StrategyEngine: {}", alert);
     }
 }
