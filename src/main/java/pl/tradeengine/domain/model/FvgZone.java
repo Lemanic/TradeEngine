@@ -12,17 +12,41 @@ public class FvgZone {
     Direction direction;
     double lowerPrice;
     double upperPrice;
+    private Double strength;
     FvgKind kind;
     FvgStatus status;
 
-    public FvgZone(Long id, Symbol symbol, Timeframe timeframe, Direction direction, double lowerPrice, double upperPrice, FvgKind kind, FvgStatus status) {
+//    public FvgZone(Long id, Symbol symbol, Timeframe timeframe, Direction direction, double lowerPrice, double upperPrice, FvgKind kind, FvgStatus status) {
+//        this.id = id;
+//        this.symbol = symbol;
+//        this.timeframe = timeframe;
+//        this.direction = direction;
+//        this.lowerPrice = lowerPrice;
+//        this.upperPrice = upperPrice;
+//        this.kind = kind;
+//        this.status = status;
+//    }
+
+
+    public FvgZone(Long id, Symbol symbol, Timeframe timeframe, Direction direction, Double lowerPrice, Double upperPrice, Double strength, FvgKind kind, FvgStatus status) {
         this.id = id;
         this.symbol = symbol;
         this.timeframe = timeframe;
         this.direction = direction;
         this.lowerPrice = lowerPrice;
         this.upperPrice = upperPrice;
+        this.strength = strength;
         this.kind = kind;
         this.status = status;
     }
+
+//    public FvgZone(Symbol symbol, Timeframe timeframe, Direction direction, double lowerPrice, double upperPrice, FvgKind kind, FvgStatus status) {
+//        this.symbol = symbol;
+//        this.timeframe = timeframe;
+//        this.direction = direction;
+//        this.lowerPrice = lowerPrice;
+//        this.upperPrice = upperPrice;
+//        this.kind = kind;
+//        this.status = status;
+//    }
 }

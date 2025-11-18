@@ -28,6 +28,7 @@ public class FvgPersistenceAdapter implements FvgRepository {
                 fvg.getTimeframe(),
                 fvg.getDirection(),
                 fvg.getLowerPrice(),
+                fvg.getStrength(),
                 fvg.getUpperPrice(),
                 fvg.getKind(),
                 fvg.getStatus()
@@ -43,6 +44,7 @@ public class FvgPersistenceAdapter implements FvgRepository {
                 e.getDirection(),
                 e.getLowerPrice(),
                 e.getUpperPrice(),
+                e.getStrength(),
                 e.getKind(),
                 e.getStatus()
         );

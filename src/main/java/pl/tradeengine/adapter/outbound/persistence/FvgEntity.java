@@ -28,6 +28,7 @@ public class FvgEntity {
 
     private Double lowerPrice;
     private Double upperPrice;
+    private Double strength;
 
     @Enumerated(EnumType.STRING)
     private FvgKind kind;
@@ -37,22 +38,15 @@ public class FvgEntity {
 
     protected FvgEntity() {}
 
-    public FvgEntity(Long id,
-                     String symbol,
-                     Timeframe timeframe,
-                     Direction direction,
-                     Double lowerPrice,
-                     Double upperPrice,
-                     FvgKind kind,
-                     FvgStatus status) {
+    public FvgEntity(Long id, String symbol, Timeframe timeframe, Direction direction, Double lowerPrice, Double upperPrice, Double strength, FvgKind kind, FvgStatus status) {
         this.id = id;
         this.symbol = symbol;
         this.timeframe = timeframe;
         this.direction = direction;
         this.lowerPrice = lowerPrice;
         this.upperPrice = upperPrice;
+        this.strength = strength;
         this.kind = kind;
         this.status = status;
     }
-
 }

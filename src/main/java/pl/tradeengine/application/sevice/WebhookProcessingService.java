@@ -1,6 +1,5 @@
 package pl.tradeengine.application.sevice;
 
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import pl.tradeengine.application.dto.DivergenceAlertDto;
@@ -26,10 +25,7 @@ public class WebhookProcessingService {
     private final FvgRepository fvgRepository;
     private final DivergenceRepository divergenceRepository;
 
-    public WebhookProcessingService(ScenarioEngine scenarioEngine,
-                                    AlertDispatchService alertDispatchService,
-                                    FvgRepository fvgRepository,
-                                    DivergenceRepository divergenceRepository) {
+    public WebhookProcessingService(ScenarioEngine scenarioEngine, AlertDispatchService alertDispatchService, FvgRepository fvgRepository, DivergenceRepository divergenceRepository) {
         this.scenarioEngine = scenarioEngine;
         this.alertDispatchService = alertDispatchService;
         this.fvgRepository = fvgRepository;
@@ -37,14 +33,24 @@ public class WebhookProcessingService {
     }
 
     public void handleFvg(FvgAlertDto dto) {
-        DomainEvent event = mapToFvgCreatedEvent(dto);
-        log.info(dto.signalType() + " " + dto.direction() +  ": " + dto.symbol() + " tf: " + dto.timeframe());
+        FvgZone fvgZone = mapDtoToFvgZone(dto);
+
+        FvgZone savedFvg = fvgRepository.save(fvgZone);
+
+        DomainEvent event = new FvgCreatedEvent(savedFvg);
+
+        log.info("Saved FVG id={}, symbol={}, tf={}", savedFvg.getId(), savedFvg.getSymbol().code(), savedFvg.getTimeframe());
         process(event);
-    }
+}
 
     public void handleDivergence(DivergenceAlertDto dto) {
-        DomainEvent event = mapToDivergenceDetectedEvent(dto);
-        log.info(dto.signalType() + " " + dto.direction() +  ": " + dto.symbol() + " tf: " + dto.timeframe());
+        DivergenceSignal signal = mapDtoToDivergenceSignal(dto);
+
+        DivergenceSignal savedSignal = divergenceRepository.save(signal);
+
+        DomainEvent event = new DivergenceDetectedEvent(savedSignal);
+
+        log.info("Saved Divergence id={}, symbol={}, tf={}", savedSignal.getId(), savedSignal.getSymbol().code(), savedSignal.getTimeframe());
         process(event);
     }
 
@@ -60,32 +66,33 @@ public class WebhookProcessingService {
         alertDispatchService.dispatch(alerts);
     }
 
-    private DomainEvent mapToFvgCreatedEvent(FvgAlertDto dto) {
+    private FvgZone mapDtoToFvgZone(FvgAlertDto dto) {
         Symbol symbol = new Symbol(dto.symbol());
         Timeframe timeframe = Timeframe.fromCode(dto.timeframe());
         Direction direction = Direction.fromSignal(dto.direction());
         FvgStatus status = FvgStatus.valueOf(dto.fvgStatus());
 
-        FvgZone fvgZone = new FvgZone(
+        return new FvgZone(
                 null,
                 symbol,
                 timeframe,
                 direction,
                 dto.fvgLow(),
                 dto.fvgHigh(),
+                21.37,
                 FvgKind.FVG,
                 status
         );
-
-        return new FvgCreatedEvent(fvgZone);
     }
 
-    private DomainEvent mapToDivergenceDetectedEvent(DivergenceAlertDto dto) {
+    private DivergenceSignal mapDtoToDivergenceSignal(DivergenceAlertDto dto) {
         Symbol symbol = new Symbol(dto.symbol());
         Timeframe timeframe = Timeframe.fromCode(dto.timeframe());
         Direction direction = Direction.fromSignal(dto.direction());
-        double strength = 0.0; // TODO
-        DivergenceSignal signal = new DivergenceSignal(
+        double strength = calculateStrengthBasedOnContext(dto);
+
+
+        return new DivergenceSignal(
                 null,
                 symbol,
                 timeframe,
@@ -93,8 +100,10 @@ public class WebhookProcessingService {
                 strength,
                 ZonedDateTime.now()
         );
+    }
 
-        return new DivergenceDetectedEvent(signal);
+    private double calculateStrengthBasedOnContext(DivergenceAlertDto dto) {
+        return 21.37;
     }
 
     private DomainEvent mapToPriceUpdateEvent(PriceUpdateDto dto) {
@@ -114,20 +123,5 @@ public class WebhookProcessingService {
 
         return new PriceCandleEvent(candle);
     }
-
-
-//    private DomainEvent mapToFvgCreatedEvent(FvgAlertDto dto) {
-//        // budujesz FvgZone
-//        FvgZone fvgZone = new FvgZone(...);
-//        FvgZone persisted = fvgRepository.save(fvgZone);
-//        return new FvgCreatedEvent(persisted);
-//    }
-
-//    private DomainEvent mapToDivergenceDetectedEvent(DivergenceAlertDto dto) {
-//        DivergenceSignal signal = new DivergenceSignal(...);
-//        DivergenceSignal persisted = divergenceRepository.save(signal);
-//        return new DivergenceDetectedEvent(persisted);
-//    }
-
 
 }
