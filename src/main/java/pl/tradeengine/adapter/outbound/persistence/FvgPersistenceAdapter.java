@@ -63,4 +63,9 @@ public class FvgPersistenceAdapter implements FvgRepository {
                 .map(this::toDomain)
                 .toList();
     }
+
+    @Override
+    public void updateStatus(Long fvgId, FvgStatus newStatus) {
+        jpaRepository.updateStatus(fvgId, newStatus);
+    }
 }

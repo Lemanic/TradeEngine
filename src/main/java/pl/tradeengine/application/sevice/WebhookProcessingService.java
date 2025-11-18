@@ -39,7 +39,9 @@ public class WebhookProcessingService {
 
         DomainEvent event = new FvgCreatedEvent(savedFvg);
 
+        log.info("Saved FVG id={}, symbol={}, tf={}", savedFvg.getId(), savedFvg.getSymbol().code(), savedFvg.getTimeframe());
         process(event);
+
 }
 
     public void handleDivergence(DivergenceAlertDto dto) {
@@ -49,13 +51,51 @@ public class WebhookProcessingService {
 
         DomainEvent event = new DivergenceDetectedEvent(savedSignal);
 
+        log.info("Saved Divergence id={}, symbol={}, tf={}", savedSignal.getId(), savedSignal.getSymbol().code(), savedSignal.getTimeframe());
         process(event);
+
     }
 
     public void handlePriceUpdate(PriceUpdateDto dto) {
-        DomainEvent event = mapToPriceUpdateEvent(dto);
+        // --- NOWA LOGIKA ZARZĄDZANIA STANEM FVG ---
+        PriceCandle tempCandle = mapDtoToPriceCandle(dto); // Tworzymy tymczasowy obiekt świecy
+        List<FvgZone> intersectedFvgs = fvgRepository.findIntersectingOpenFvgs(
+                tempCandle.symbol(), tempCandle.timeframe(), tempCandle.close()
+        );
+
+        // Jeśli cena weszła w jakiś FVG o statusie CREATED, zmień jego status na TOUCHED
+        for (FvgZone fvg : intersectedFvgs) {
+            fvgRepository.updateStatus(fvg.getId(), FvgStatus.TOUCHED);
+            log.info("FVG status updated to TOUCHED for id: {}", fvg.getId());
+        }
+        // --- KONIEC NOWEJ LOGIKI ---
+
+        // Ta część pozostaje bez zmian - wciąż wysyłamy event do silnika scenariuszy
+        DomainEvent event = new PriceCandleEvent(tempCandle);
+        log.info("Processing Price Update for symbol: {}", dto.symbol());
         process(event);
     }
+
+//    public void handlePriceUpdate(PriceUpdateDto dto) {
+//        DomainEvent event = mapToPriceUpdateEvent(dto);
+//        process(event);
+//    }
+    private PriceCandle mapDtoToPriceCandle(PriceUpdateDto dto) {
+        Symbol symbol = new Symbol(dto.symbol());
+        Timeframe timeframe = Timeframe.fromCode(dto.timeframe());
+
+        return new PriceCandle(
+                symbol,
+                timeframe,
+                null,
+                null,
+                0.0,
+                dto.currentHigh(),
+                dto.currentLow(),
+                dto.close()
+    );
+    }
+
 
     private void process(DomainEvent event) {
         List<AlertToSend> alerts = scenarioEngine.onEvent(event);
@@ -79,17 +119,6 @@ public class WebhookProcessingService {
                 FvgKind.FVG,
                 status
         );
-
-//        return new FvgZone(
-//                null,
-//                symbol,
-//                timeframe,
-//                direction,
-//                dto.fvgLow(),
-//                dto.fvgHigh(),
-//                FvgKind.FVG,  // <-- Poprawny parametr dla 'kind'
-//                status        // <-- Poprawny parametr dla 'status'
-//        );
     }
 
     private DivergenceSignal mapDtoToDivergenceSignal(DivergenceAlertDto dto) {
@@ -110,24 +139,6 @@ public class WebhookProcessingService {
 
     private double calculateStrengthBasedOnContext(DivergenceAlertDto dto) {
         return 21.37;
-    }
-
-    private DomainEvent mapToPriceUpdateEvent(PriceUpdateDto dto) {
-        Symbol symbol = new Symbol(dto.symbol());
-        Timeframe timeframe = Timeframe.fromCode(dto.timeframe());
-
-        PriceCandle candle = new PriceCandle(
-                symbol,
-                timeframe,
-                null,
-                null,
-                0.0,
-                dto.currentHigh(),
-                dto.currentLow(),
-                dto.close()
-        );
-
-        return new PriceCandleEvent(candle);
     }
 
 }
