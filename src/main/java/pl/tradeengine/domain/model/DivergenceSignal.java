@@ -11,7 +11,7 @@ public class DivergenceSignal {
     Long id;
     Symbol symbol;
     Timeframe timeframe;
-    Direction direction; // BULLISH: long, BEARISH: short
+    Direction direction;
     Double strength;
     ZonedDateTime detectedAt;
 

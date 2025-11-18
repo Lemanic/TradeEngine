@@ -6,5 +6,4 @@ public final class FvgCreatedEvent implements DomainEvent {
     public FvgCreatedEvent(FvgZone fvgZone) {
 
     }
-    // ...
 }

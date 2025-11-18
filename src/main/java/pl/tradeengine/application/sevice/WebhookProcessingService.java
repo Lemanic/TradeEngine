@@ -39,7 +39,6 @@ public class WebhookProcessingService {
 
         DomainEvent event = new FvgCreatedEvent(savedFvg);
 
-        log.info("Saved FVG id={}, symbol={}, tf={}", savedFvg.getId(), savedFvg.getSymbol().code(), savedFvg.getTimeframe());
         process(event);
 }
 
@@ -50,14 +49,11 @@ public class WebhookProcessingService {
 
         DomainEvent event = new DivergenceDetectedEvent(savedSignal);
 
-        log.info("Saved Divergence id={}, symbol={}, tf={}", savedSignal.getId(), savedSignal.getSymbol().code(), savedSignal.getTimeframe());
         process(event);
     }
 
     public void handlePriceUpdate(PriceUpdateDto dto) {
         DomainEvent event = mapToPriceUpdateEvent(dto);
-        log.info(dto.symbol() + ", " + dto.currentLow() + dto.currentHigh() + ", " + dto.signalType() + "," + dto.timeframe());
-        log.info(dto.signalType() +  ": " + dto.symbol() + " low: " + dto.currentLow() + ", high: " + dto.currentHigh());
         process(event);
     }
 
@@ -90,7 +86,6 @@ public class WebhookProcessingService {
         Timeframe timeframe = Timeframe.fromCode(dto.timeframe());
         Direction direction = Direction.fromSignal(dto.direction());
         double strength = calculateStrengthBasedOnContext(dto);
-
 
         return new DivergenceSignal(
                 null,

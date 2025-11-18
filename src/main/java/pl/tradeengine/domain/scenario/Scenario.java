@@ -9,5 +9,4 @@ public interface Scenario {
     List<AlertToSend> onEvent(DomainEvent event);
     Long id();
     String name();
-//    List<AlertToSend> onEvent(DomainEvent event);
 }

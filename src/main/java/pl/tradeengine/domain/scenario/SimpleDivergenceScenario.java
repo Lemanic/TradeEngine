@@ -28,7 +28,7 @@ public class SimpleDivergenceScenario implements Scenario {
                 signal.getDirection(),
                 name(),
                 signal.getTimeframe(),
-                /* entryPrice */ 0.0,
+                0.0,
                 Optional.empty(),
                 Optional.empty(),
                 "Divergence on " + signal.getTimeframe()

@@ -15,7 +15,6 @@ class KeyLevelDivergenceScenario implements Scenario {
             return List.of();
         }
         PriceCandle candle = priceEvent.candle();
-        // logika
         return null;
     }
 
@@ -28,6 +27,5 @@ class KeyLevelDivergenceScenario implements Scenario {
     public String name() {
         return "";
     }
-
 
 }
