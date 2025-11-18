@@ -48,13 +48,10 @@ public class KeyLevelDivergenceScenario implements Scenario {
         );
 
         if (touchedFvgs.isEmpty()) {
-            // Nie znaleziono żadnego "aktywnego" FVG, który czekałby na sygnał. Koniec pracy.
             return List.of();
         }
 
-        // --- WARUNKI SPEŁNIONE: MAMY DYWERGENCJĘ I WCZEŚNIEJ DOTKNIĘTY FVG! ---
-
-        FvgZone fvg = touchedFvgs.get(0); // Bierzemy pierwszy z brzegu
+        FvgZone fvg = touchedFvgs.get(0);
 
         String description = String.format(
                 "ALERT: Wykryto dywergencję %s po wcześniejszym dotknięciu strefy FVG [%.2f-%.2f]!",
@@ -66,13 +63,12 @@ public class KeyLevelDivergenceScenario implements Scenario {
                 divergence.getDirection(),
                 name(),
                 divergence.getTimeframe(),
-                fvg.getUpperPrice(), // Przykładowa cena wejścia, można ją dopracować
+                fvg.getUpperPrice(),
                 Optional.empty(),
                 Optional.empty(),
                 description
         );
 
-        // KROK 3: Zmień status FVG na "CONSUMED", aby nie generować alertów w nieskończoność
         fvgRepository.updateStatus(fvg.getId(), FvgStatus.CONSUMED);
 
         log.info("FVG with id {} has been consumed to generate an alert.", fvg.getId());
