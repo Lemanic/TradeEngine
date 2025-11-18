@@ -3,7 +3,11 @@ package pl.tradeengine.adapter.outbound.persistence;
 import org.springframework.stereotype.Repository;
 import pl.tradeengine.domain.model.DivergenceSignal;
 import pl.tradeengine.domain.model.Symbol;
+import pl.tradeengine.domain.model.Timeframe;
 import pl.tradeengine.domain.port.DivergenceRepository;
+
+import java.time.ZonedDateTime;
+import java.util.Optional;
 
 @Repository
 public class DivergencePersistenceAdapter implements DivergenceRepository {
@@ -35,4 +39,23 @@ public class DivergencePersistenceAdapter implements DivergenceRepository {
         );
     }
 
+    @Override
+    public Optional<DivergenceSignal> findMostRecent(Symbol symbol, Timeframe timeframe, ZonedDateTime since) {
+        Optional<DivergenceEntity> entityOpt = jpaRepository.findFirstBySymbolAndTimeframeAndDetectedAtAfterOrderByDetectedAtDesc(
+                symbol.code(), timeframe, since
+        );
+
+        return entityOpt.map(this::toDomain);
+    }
+
+    private DivergenceSignal toDomain(DivergenceEntity entity) {
+        return new DivergenceSignal(
+                entity.getId(),
+                new Symbol(entity.getSymbol()),
+                entity.getTimeframe(),
+                entity.getDirection(),
+                entity.getStrength(),
+                entity.getDetectedAt()
+        );
+    }
 }
