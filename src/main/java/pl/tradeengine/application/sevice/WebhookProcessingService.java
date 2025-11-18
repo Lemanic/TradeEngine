@@ -124,7 +124,7 @@ public class WebhookProcessingService {
                 0.0,
                 dto.currentHigh(),
                 dto.currentLow(),
-                0.0
+                dto.close()
         );
 
         return new PriceCandleEvent(candle);

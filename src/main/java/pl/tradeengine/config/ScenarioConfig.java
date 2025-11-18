@@ -11,10 +11,10 @@ import java.util.List;
 @Configuration
 public class ScenarioConfig {
 
-    @Bean
-    public Scenario simpleDivergenceScenario() {
-        return new SimpleDivergenceScenario();
-    }
+//    @Bean
+//    public Scenario simpleDivergenceScenario() {
+//        return new SimpleDivergenceScenario();
+//    }
 
     @Bean
     public ScenarioEngine scenarioEngine(List<Scenario> scenarios) {
