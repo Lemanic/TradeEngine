@@ -4,5 +4,6 @@ public enum FvgStatus {
     CREATED,
     TOUCHED,
     FILLED,
+    CONSUMED,
     INVALIDATED
 }

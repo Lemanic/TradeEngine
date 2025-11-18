@@ -13,4 +13,6 @@ public interface FvgRepository {
     List<FvgZone> findIntersectingOpenFvgs(Symbol symbol, Timeframe timeframe, double price);
 
     void updateStatus(Long fvgId, FvgStatus newStatus);
+
+    List<FvgZone> findTouched(Symbol symbol, Timeframe timeframe);
 }

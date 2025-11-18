@@ -25,4 +25,6 @@ public interface JpaFvgRepository extends JpaRepository<FvgEntity, Long> {
     @Query("UPDATE FvgEntity f SET f.status = :newStatus WHERE f.id = :id")
     void updateStatus(@Param("id") Long id, @Param("newStatus") FvgStatus newStatus);
 
+    List<FvgEntity> findBySymbolAndTimeframeAndStatus(String symbol, Timeframe timeframe, FvgStatus status);
+
 }

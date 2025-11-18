@@ -68,4 +68,14 @@ public class FvgPersistenceAdapter implements FvgRepository {
     public void updateStatus(Long fvgId, FvgStatus newStatus) {
         jpaRepository.updateStatus(fvgId, newStatus);
     }
+
+    @Override
+    public List<FvgZone> findTouched(Symbol symbol, Timeframe timeframe) {
+        List<FvgEntity> entities = jpaRepository.findBySymbolAndTimeframeAndStatus(
+                symbol.code(), timeframe, FvgStatus.TOUCHED
+        );
+        return entities.stream()
+                .map(this::toDomain)
+                .toList();
+    }
 }
