@@ -75,10 +75,21 @@ public class WebhookProcessingService {
                 direction,
                 dto.fvgLow(),
                 dto.fvgHigh(),
-                21.37,
+                null,
                 FvgKind.FVG,
                 status
         );
+
+//        return new FvgZone(
+//                null,
+//                symbol,
+//                timeframe,
+//                direction,
+//                dto.fvgLow(),
+//                dto.fvgHigh(),
+//                FvgKind.FVG,  // <-- Poprawny parametr dla 'kind'
+//                status        // <-- Poprawny parametr dla 'status'
+//        );
     }
 
     private DivergenceSignal mapDtoToDivergenceSignal(DivergenceAlertDto dto) {

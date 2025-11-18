@@ -32,8 +32,8 @@ public class FvgPersistenceAdapter implements FvgRepository {
                 fvg.getTimeframe(),
                 fvg.getDirection(),
                 fvg.getLowerPrice(),
-                fvg.getStrength(),
                 fvg.getUpperPrice(),
+                fvg.getStrength(),
                 fvg.getKind(),
                 fvg.getStatus()
         );

@@ -56,8 +56,6 @@ public class KeyLevelDivergenceScenario implements Scenario {
             return List.of(); // Nie było dywergencji, koniec pracy
         }
 
-        // --- WARUNKI SPEŁNIONE! ---
-
         FvgZone fvg = intersectedFvgs.get(0); // Bierzemy pierwszy znaleziony FVG
         DivergenceSignal divergence = recentDivergenceOpt.get();
 
