@@ -22,4 +22,6 @@ public class AlertToSend {
         this.takeProfit = takeProfit;
         this.description = description;
     }
+
+    // TODO toString
 }

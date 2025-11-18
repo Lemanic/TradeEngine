@@ -8,7 +8,6 @@ import pl.tradeengine.domain.model.Timeframe;
 
 import java.time.ZonedDateTime;
 
-// pl.tradeengine.adapter.outbound.persistence.DivergenceEntity
 @Entity
 @Getter
 @Setter

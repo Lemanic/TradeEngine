@@ -18,24 +18,23 @@ public class FvgEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String symbol;          // np. "BTCUSDT"
+    private String symbol;
 
     @Enumerated(EnumType.STRING)
     private Timeframe timeframe;
 
     @Enumerated(EnumType.STRING)
-    private Direction direction;    // LONG/SHORT
+    private Direction direction;
 
     private Double lowerPrice;
     private Double upperPrice;
 
     @Enumerated(EnumType.STRING)
-    private FvgKind kind;           // FVG / IFVG
+    private FvgKind kind;
 
     @Enumerated(EnumType.STRING)
-    private FvgStatus status;       // CREATED / TOUCHED / FILLED ...
+    private FvgStatus status;
 
-    // wymagany przez JPA konstruktor bezargumentowy
     protected FvgEntity() {}
 
     public FvgEntity(Long id,
@@ -56,5 +55,4 @@ public class FvgEntity {
         this.status = status;
     }
 
-    // gettery/settery albo record + @Entity jeśli chcesz się pobawić
 }

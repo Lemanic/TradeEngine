@@ -5,7 +5,6 @@ import pl.tradeengine.domain.model.FvgZone;
 import pl.tradeengine.domain.model.Symbol;
 import pl.tradeengine.domain.port.FvgRepository;
 
-// pl.tradeengine.adapter.outbound.persistence.FvgPersistenceAdapter
 @Repository
 public class FvgPersistenceAdapter implements FvgRepository {
 
@@ -24,8 +23,8 @@ public class FvgPersistenceAdapter implements FvgRepository {
 
     private FvgEntity toEntity(FvgZone fvg) {
         return new FvgEntity(
-                fvg.getId(),                          // jeśli masz id() w domenie, inaczej null
-                fvg.getSymbol().code(),               // np. String w VO Symbol
+                fvg.getId(),
+                fvg.getSymbol().code(),
                 fvg.getTimeframe(),
                 fvg.getDirection(),
                 fvg.getLowerPrice(),

@@ -26,14 +26,13 @@ public class DivergencePersistenceAdapter implements DivergenceRepository {
         );
         DivergenceEntity saved = jpaRepository.save(entity);
         return new DivergenceSignal(
-                saved.getId(),                 // Long
-                new Symbol(saved.getSymbol()), // Symbol
-                saved.getTimeframe(),          // Timeframe
-                saved.getDirection(),          // Direction
-                saved.getStrength(),           // Double
-                saved.getDetectedAt()          // ZonedDateTime
+                saved.getId(),
+                new Symbol(saved.getSymbol()),
+                saved.getTimeframe(),
+                saved.getDirection(),
+                saved.getStrength(),
+                saved.getDetectedAt()
         );
     }
-
 
 }

@@ -38,19 +38,20 @@ public class WebhookProcessingService {
 
     public void handleFvg(FvgAlertDto dto) {
         DomainEvent event = mapToFvgCreatedEvent(dto);
-        log.info(dto.symbol() + ", " + dto.direction() + ", " + dto.signalType() + "," + dto.timeframe());
+        log.info(dto.signalType() + " " + dto.direction() +  ": " + dto.symbol() + " tf: " + dto.timeframe());
         process(event);
     }
 
     public void handleDivergence(DivergenceAlertDto dto) {
         DomainEvent event = mapToDivergenceDetectedEvent(dto);
-        log.info(dto.symbol() + ", " + dto.direction() + ", " + dto.signalType() + "," + dto.timeframe());
+        log.info(dto.signalType() + " " + dto.direction() +  ": " + dto.symbol() + " tf: " + dto.timeframe());
         process(event);
     }
 
     public void handlePriceUpdate(PriceUpdateDto dto) {
         DomainEvent event = mapToPriceUpdateEvent(dto);
         log.info(dto.symbol() + ", " + dto.currentLow() + dto.currentHigh() + ", " + dto.signalType() + "," + dto.timeframe());
+        log.info(dto.signalType() +  ": " + dto.symbol() + " low: " + dto.currentLow() + ", high: " + dto.currentHigh());
         process(event);
     }
 
