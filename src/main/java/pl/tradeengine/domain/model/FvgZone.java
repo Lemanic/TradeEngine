@@ -12,8 +12,8 @@ public class FvgZone {
     Direction direction;
     double lowerPrice;
     double upperPrice;
-    FvgKind kind; // FVG, IFVG
-    FvgStatus status; // OPEN, TOUCHED, FILLED, INVALIDATED
+    FvgKind kind;
+    FvgStatus status;
 
     public FvgZone(Long id, Symbol symbol, Timeframe timeframe, Direction direction, double lowerPrice, double upperPrice, FvgKind kind, FvgStatus status) {
         this.id = id;
