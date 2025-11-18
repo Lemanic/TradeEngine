@@ -8,21 +8,21 @@ import pl.tradeengine.alerts.domain.Direction;
 
 import java.time.Instant;
 
-@Getter
-@Setter
-@Entity
-@Table(name = "divergences")
+//@Getter
+//@Setter
+//@Entity
+//@Table(name = "divergences")
 public class DivergenceEntity {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+//
+//    @Id
+//    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private String symbol;
 
     private String timeframe;
 
-    @Enumerated(EnumType.STRING)
+//    @Enumerated(EnumType.STRING)
     private Direction direction;
 
     @NotNull

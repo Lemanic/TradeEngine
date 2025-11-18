@@ -7,10 +7,10 @@ import pl.tradeengine.alerts.domain.Direction;
 import java.time.Instant;
 import java.util.List;
 
-@Repository
-public interface DivergenceRepository extends JpaRepository<DivergenceEntity, Long> {
+//@Repository
+public interface DivergenceRepository  {
 
-    List<DivergenceEntity> findBySymbolAndTimeframeAndDirectionAndTimestampBetween(
-            String symbol, String timeframe, Direction direction, Instant from, Instant to);
+//    List<DivergenceEntity> findBySymbolAndTimeframeAndDirectionAndTimestampBetween(
+//            String symbol, String timeframe, Direction direction, Instant from, Instant to);
 }
 
