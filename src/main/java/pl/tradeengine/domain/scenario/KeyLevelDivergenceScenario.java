@@ -31,31 +31,38 @@ public class KeyLevelDivergenceScenario implements Scenario {
         return "SIMPLE_FVG_DIVERGENCE_STRATEGY";
     }
 
-    // Wklej to w miejsce starej metody onEvent w KeyLevelDivergenceScenario.java
-
     @Override
     public List<AlertToSend> onEvent(DomainEvent event) {
-        // KROK 1: Zmiana triggera - teraz reagujemy na nową dywergencję
+        // Trigger wciąż ten sam - nowa dywergencja
         if (!(event instanceof DivergenceDetectedEvent divergenceEvent)) {
-            return List.of(); // Ignorujemy wszystkie inne eventy
+            return List.of();
         }
 
-        DivergenceSignal divergence = divergenceEvent.signal(); // Używamy .signal() jeśli DivergenceDetectedEvent to rekord
-
-        // KROK 2: Sprawdź, czy w bazie istnieje FVG o statusie TOUCHED
+        DivergenceSignal divergence = divergenceEvent.signal();
         List<FvgZone> touchedFvgs = fvgRepository.findTouched(
                 divergence.getSymbol(), divergence.getTimeframe()
         );
 
-        if (touchedFvgs.isEmpty()) {
+        // --- NOWA, ULEPSZONA LOGIKA ---
+
+        // KROK 1: Znajdź pierwszy FVG, który ma ZGODNY KIERUNEK z dywergencją
+        Optional<FvgZone> matchingFvgOpt = touchedFvgs.stream()
+                .filter(fvg -> fvg.getDirection() == divergence.getDirection()) // Sprawdzamy zgodność kierunków!
+                .findFirst(); // Bierzemy pierwszy pasujący
+
+        // KROK 2: Jeśli nie znaleziono pasującego FVG, zakończ pracę
+        if (matchingFvgOpt.isEmpty()) {
+            log.info("Divergence {} detected, but no matching FVG was found. No alert.", divergence.getDirection());
             return List.of();
         }
 
-        FvgZone fvg = touchedFvgs.get(0);
+        // --- WARUNKI SPEŁNIONE: MAMY DYWERGENCJĘ I PASUJĄCY, DOTKNIĘTY FVG! ---
+
+        FvgZone matchingFvg = matchingFvgOpt.get();
 
         String description = String.format(
-                "ALERT: Wykryto dywergencję %s po wcześniejszym dotknięciu strefy FVG [%.2f-%.2f]!",
-                divergence.getDirection(), fvg.getLowerPrice(), fvg.getUpperPrice()
+                "ALERT: Wykryto dywergencję %s po dotknięciu zgodnej strefy FVG [%.2f-%.2f]!",
+                divergence.getDirection(), matchingFvg.getLowerPrice(), matchingFvg.getUpperPrice()
         );
 
         AlertToSend alert = new AlertToSend(
@@ -63,69 +70,18 @@ public class KeyLevelDivergenceScenario implements Scenario {
                 divergence.getDirection(),
                 name(),
                 divergence.getTimeframe(),
-                fvg.getUpperPrice(),
+                matchingFvg.getUpperPrice(),
                 Optional.empty(),
                 Optional.empty(),
                 description
         );
 
-        fvgRepository.updateStatus(fvg.getId(), FvgStatus.CONSUMED);
-
-        log.info("FVG with id {} has been consumed to generate an alert.", fvg.getId());
+        // KROK 3: "Zużyj" FVG, aby nie generować alertów w nieskończoność
+        fvgRepository.updateStatus(matchingFvg.getId(), FvgStatus.CONSUMED);
+        log.info("FVG with id {} has been consumed to generate an alert.", matchingFvg.getId());
 
         return List.of(alert);
     }
-
-
-//    @Override
-//    public List<AlertToSend> onEvent(DomainEvent event) {
-//        // Ten scenariusz reaguje tylko na nowe ceny
-//        if (!(event instanceof PriceCandleEvent priceEvent)) {
-//            return List.of();
-//        }
-//
-//        PriceCandle candle = priceEvent.candle();
-//
-//        // 1. Sprawdź, czy cena weszła w jakiś otwarty FVG
-//        List<FvgZone> intersectedFvgs = fvgRepository.findIntersectingOpenFvgs(
-//                candle.symbol(), candle.timeframe(), candle.close() // Używamy ceny zamknięcia świecy
-//        );
-//
-//        if (intersectedFvgs.isEmpty()) {
-//            return List.of(); // Nie jesteśmy w strefie FVG, koniec pracy
-//        }
-//
-//        // 2. Jeśli tak, sprawdź czy była ostatnio dywergencja
-//        ZonedDateTime lookbackTime = ZonedDateTime.now().minus(Duration.ofHours(4)); // Patrzymy 4h wstecz
-//        Optional<DivergenceSignal> recentDivergenceOpt = divergenceRepository.findMostRecent(
-//                candle.symbol(), candle.timeframe(), lookbackTime
-//        );
-//
-//        if (recentDivergenceOpt.isEmpty()) {
-//            return List.of(); // Nie było dywergencji, koniec pracy
-//        }
-//
-//        FvgZone fvg = intersectedFvgs.get(0); // Bierzemy pierwszy znaleziony FVG
-//        DivergenceSignal divergence = recentDivergenceOpt.get();
-//
-//        String description = String.format(
-//                "POTENCJAŁ: Cena %s weszła w FVG [%.2f-%.2f] przy istniejącej dywergencji %s!",
-//                candle.close(), fvg.getLowerPrice(), fvg.getUpperPrice(), divergence.getDirection()
-//        );
-//
-//        AlertToSend alert = new AlertToSend(
-//                candle.symbol(),
-//                divergence.getDirection(),
-//                name(),
-//                candle.timeframe(),
-//                candle.close(),
-//                Optional.empty(),
-//                Optional.empty(),
-//                description
-//        );
-//
-//        return List.of(alert);
-//    }
 
     @Override
     public Long id() {
