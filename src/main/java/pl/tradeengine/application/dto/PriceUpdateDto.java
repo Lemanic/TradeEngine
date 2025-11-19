@@ -5,5 +5,6 @@ public record PriceUpdateDto(
         String timeframe,
         String signalType,
         double currentHigh,
-        double currentLow
+        double currentLow,
+        Double close
 ) {}

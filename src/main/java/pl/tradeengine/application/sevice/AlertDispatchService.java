@@ -16,7 +16,11 @@ public class AlertDispatchService {
     }
 
     public void dispatch(List<AlertToSend> alerts) {
-        alerts.forEach(alertPublisher::publish);
+        if (alerts == null || alerts.isEmpty()) {
+            return;
+        }
+
+        alertPublisher.publish(alerts);
     }
 }
 

@@ -1,9 +1,13 @@
 package pl.tradeengine.adapter.outbound.persistence;
 
 import org.springframework.stereotype.Repository;
+import pl.tradeengine.domain.model.FvgStatus;
 import pl.tradeengine.domain.model.FvgZone;
 import pl.tradeengine.domain.model.Symbol;
+import pl.tradeengine.domain.model.Timeframe;
 import pl.tradeengine.domain.port.FvgRepository;
+
+import java.util.List;
 
 @Repository
 public class FvgPersistenceAdapter implements FvgRepository {
@@ -28,8 +32,8 @@ public class FvgPersistenceAdapter implements FvgRepository {
                 fvg.getTimeframe(),
                 fvg.getDirection(),
                 fvg.getLowerPrice(),
-                fvg.getStrength(),
                 fvg.getUpperPrice(),
+                fvg.getStrength(),
                 fvg.getKind(),
                 fvg.getStatus()
         );
@@ -48,5 +52,30 @@ public class FvgPersistenceAdapter implements FvgRepository {
                 e.getKind(),
                 e.getStatus()
         );
+    }
+
+    @Override
+    public List<FvgZone> findIntersectingOpenFvgs(Symbol symbol, Timeframe timeframe, double price) {
+        List<FvgEntity> entities = jpaRepository.findIntersectingOpenFvgs(
+                symbol.code(), timeframe, price, FvgStatus.CREATED // Zakładamy, że 'CREATED' oznacza otwarty FVG
+        );
+        return entities.stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    public void updateStatus(Long fvgId, FvgStatus newStatus) {
+        jpaRepository.updateStatus(fvgId, newStatus);
+    }
+
+    @Override
+    public List<FvgZone> findTouched(Symbol symbol, Timeframe timeframe) {
+        List<FvgEntity> entities = jpaRepository.findBySymbolAndTimeframeAndStatus(
+                symbol.code(), timeframe, FvgStatus.TOUCHED
+        );
+        return entities.stream()
+                .map(this::toDomain)
+                .toList();
     }
 }

@@ -10,9 +10,9 @@ public class FvgZone {
     Symbol symbol;
     Timeframe timeframe;
     Direction direction;
-    double lowerPrice;
-    double upperPrice;
-    private Double strength;
+    Double lowerPrice;
+    Double upperPrice;
+    Double strength;
     FvgKind kind;
     FvgStatus status;
 
