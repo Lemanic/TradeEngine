@@ -16,7 +16,7 @@ import java.util.List;
 
 @Slf4j
 @Service
-@Profile("prod") // Aktywne tylko na profilu "prod"
+@Profile("prod")
 public class TelegramAlertPublisher implements AlertPublisher {
 
     private final SimpleTelegramBot bot;
@@ -36,11 +36,10 @@ public class TelegramAlertPublisher implements AlertPublisher {
     @Override
     public void publish(List<AlertToSend> alerts) {
         for (AlertToSend alert : alerts) {
-            bot.sendMessage(alert.toString()); // Używamy toString(), które poprawiłeś!
+            bot.sendMessage(alert.toString());
         }
     }
 
-    // Wewnętrzna klasa bota, żeby nie zaśmiecać projektu
     private static class SimpleTelegramBot extends TelegramLongPollingBot {
         private final String chatId;
 
@@ -56,7 +55,7 @@ public class TelegramAlertPublisher implements AlertPublisher {
 
         @Override
         public String getBotUsername() {
-            return "TradeEngineBot"; // Dowolna nazwa
+            return "TradeEngineBot";
         }
 
         public void sendMessage(String message) {
