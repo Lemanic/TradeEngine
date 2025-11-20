@@ -1,9 +1,9 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/tradeengine
+    url: jdbc:postgresql://localhost:5432/trade_engine_db
     driver-class-name: org.postgresql.Driver
-    username: postgres
-    password: twojehaslo
+    username: trade_user
+    password: 2137Leman2137!
   jpa:
     hibernate:
       ddl-auto: validate
