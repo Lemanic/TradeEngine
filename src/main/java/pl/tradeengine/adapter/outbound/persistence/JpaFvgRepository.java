@@ -8,6 +8,7 @@ import pl.tradeengine.domain.model.FvgStatus;
 import pl.tradeengine.domain.model.Timeframe;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface JpaFvgRepository extends JpaRepository<FvgEntity, Long> {
@@ -15,7 +16,6 @@ public interface JpaFvgRepository extends JpaRepository<FvgEntity, Long> {
     @Query("SELECT f FROM FvgEntity f WHERE f.symbol = :symbol AND f.timeframe = :timeframe AND f.status = :status AND :price >= f.lowerPrice AND :price <= f.upperPrice")
     List<FvgEntity> findIntersectingOpenFvgs(
             @Param("symbol") String symbol,
-            @Param("timeframe") Timeframe timeframe,
             @Param("price") double price,
             @Param("status") FvgStatus status
     );
@@ -26,5 +26,14 @@ public interface JpaFvgRepository extends JpaRepository<FvgEntity, Long> {
     void updateStatus(@Param("id") Long id, @Param("newStatus") FvgStatus newStatus);
 
     List<FvgEntity> findBySymbolAndTimeframeAndStatus(String symbol, Timeframe timeframe, FvgStatus status);
+
+
+    @Query("SELECT f FROM FvgEntity f WHERE f.symbol = :symbol AND f.status IN ('CREATED', 'TOUCHED') " +
+            "AND (f.upperPrice >= :low AND f.lowerPrice <= :high)")
+    List<FvgEntity> findIntersectingForAllTimeframes(
+            @Param("symbol") String symbol,
+            @Param("low") BigDecimal low,
+            @Param("high") BigDecimal high
+    );
 
 }

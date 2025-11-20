@@ -1,9 +1,21 @@
 package pl.tradeengine.domain.model;
 
+import java.time.Duration;
+
 public enum Timeframe {
-    M5, M15, H1, H4, H12, D1, W1;
+    M5(Duration.ofMinutes(5)),
+    M15(Duration.ofMinutes(15)),
+    H1(Duration.ofHours(1)),
+    H4(Duration.ofHours(4)),
+    D1(Duration.ofHours(24));
 
     public static Timeframe fromCode(String code) {
         return Timeframe.valueOf(code);
     }
+
+    private final Duration duration;
+
+    Timeframe(Duration duration) { this.duration = duration; }
+
+    public Duration getDuration() { return duration; }
 }

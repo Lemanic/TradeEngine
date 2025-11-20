@@ -1,5 +1,6 @@
 package pl.tradeengine.domain.model;
 
+import java.math.BigDecimal;
 import java.util.Optional;
 
 public class AlertToSend {
@@ -7,12 +8,12 @@ public class AlertToSend {
     Direction direction;
     String scenarioName;
     Timeframe timeframe;
-    double entryPrice;
+    BigDecimal entryPrice;
     Optional<Double> stopLoss;
     Optional<Double> takeProfit;
     String description;
 
-    public AlertToSend(Symbol symbol, Direction direction, String scenarioName, Timeframe timeframe, double entryPrice, Optional<Double> stopLoss, Optional<Double> takeProfit, String description) {
+    public AlertToSend(Symbol symbol, Direction direction, String scenarioName, Timeframe timeframe, BigDecimal entryPrice, Optional<Double> stopLoss, Optional<Double> takeProfit, String description) {
         this.symbol = symbol;
         this.direction = direction;
         this.scenarioName = scenarioName;
@@ -26,8 +27,8 @@ public class AlertToSend {
     @Override
     public String toString() {
         return String.format(
-                "Alert[%s, %s, %s, TF=%s, Entry=%.2f, Desc=%s]",
-                scenarioName, symbol.code(), direction, timeframe, entryPrice, description
+                "ALERT! %s, %s, %s, TF=%s",
+                description, symbol.code(), direction, timeframe
         );
     }
 

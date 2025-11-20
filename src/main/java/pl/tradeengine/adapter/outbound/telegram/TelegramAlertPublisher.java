@@ -3,6 +3,7 @@ package pl.tradeengine.adapter.outbound.telegram;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
@@ -16,7 +17,8 @@ import java.util.List;
 
 @Slf4j
 @Service
-@Profile("prod")
+@Profile("dev")
+@Primary
 public class TelegramAlertPublisher implements AlertPublisher {
 
     private final SimpleTelegramBot bot;
