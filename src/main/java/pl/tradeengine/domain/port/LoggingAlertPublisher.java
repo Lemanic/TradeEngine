@@ -16,7 +16,7 @@ public class LoggingAlertPublisher implements AlertPublisher {
 
     @Override
     public void publish(List<AlertToSend> alerts) {
-        for (AlertToSend alert : alerts) { // Dodajemy pętlę for-each
+        for (AlertToSend alert : alerts) {
             log.info("ALERT: {}", alert.toString());
         }
     }

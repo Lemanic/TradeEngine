@@ -50,7 +50,6 @@ public class TelegramAlertPublisher implements AlertPublisher {
 
         @Override
         public void onUpdateReceived(Update update) {
-            // Ignorujemy przychodzące wiadomości, bot ma tylko wysyłać
         }
 
         @Override

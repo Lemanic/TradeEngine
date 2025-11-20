@@ -55,16 +55,6 @@ public class FvgPersistenceAdapter implements FvgRepository {
         );
     }
 
-//    @Override
-//    public List<FvgZone> findIntersectingOpenFvgs(Symbol symbol, double price) {
-//        List<FvgEntity> entities = jpaRepository.findIntersectingOpenFvgs(
-//                symbol.code(), price, FvgStatus.CREATED // Zakładamy, że 'CREATED' oznacza otwarty FVG
-//        );
-//        return entities.stream()
-//                .map(this::toDomain)
-//                .toList();
-//    }
-
     @Override
     public List<FvgZone> findIntersectingOpenFvgs(Symbol symbol, BigDecimal low, BigDecimal high) {
         List<FvgEntity> entities = jpaRepository.findIntersectingForAllTimeframes(
