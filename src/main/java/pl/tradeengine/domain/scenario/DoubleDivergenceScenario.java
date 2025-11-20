@@ -17,7 +17,7 @@ import java.util.Optional;
 @Component
 public class DoubleDivergenceScenario implements Scenario {
 
-    private static final int CANDLE_LOOKBACK_WINDOW = 30; // 30 świeczek wstecz
+    private static final int CANDLE_LOOKBACK_WINDOW = 30;
     private final DivergenceRepository divergenceRepository;
 
     public DoubleDivergenceScenario(DivergenceRepository divergenceRepository) {
