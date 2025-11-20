@@ -7,6 +7,7 @@ import pl.tradeengine.domain.model.Symbol;
 import pl.tradeengine.domain.model.Timeframe;
 import pl.tradeengine.domain.port.FvgRepository;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Repository
@@ -54,15 +55,26 @@ public class FvgPersistenceAdapter implements FvgRepository {
         );
     }
 
+//    @Override
+//    public List<FvgZone> findIntersectingOpenFvgs(Symbol symbol, double price) {
+//        List<FvgEntity> entities = jpaRepository.findIntersectingOpenFvgs(
+//                symbol.code(), price, FvgStatus.CREATED // Zakładamy, że 'CREATED' oznacza otwarty FVG
+//        );
+//        return entities.stream()
+//                .map(this::toDomain)
+//                .toList();
+//    }
+
     @Override
-    public List<FvgZone> findIntersectingOpenFvgs(Symbol symbol, Timeframe timeframe, double price) {
-        List<FvgEntity> entities = jpaRepository.findIntersectingOpenFvgs(
-                symbol.code(), timeframe, price, FvgStatus.CREATED // Zakładamy, że 'CREATED' oznacza otwarty FVG
+    public List<FvgZone> findIntersectingOpenFvgs(Symbol symbol, BigDecimal low, BigDecimal high) {
+        List<FvgEntity> entities = jpaRepository.findIntersectingForAllTimeframes(
+                symbol.code(), low, high
         );
         return entities.stream()
                 .map(this::toDomain)
                 .toList();
     }
+
 
     @Override
     public void updateStatus(Long fvgId, FvgStatus newStatus) {

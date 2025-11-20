@@ -61,7 +61,7 @@ public class KeyLevelDivergenceScenario implements Scenario {
         FvgZone matchingFvg = matchingFvgOpt.get();
 
         String description = String.format(
-                "ALERT: Wykryto dywergencję %s po dotknięciu zgodnej strefy FVG [%.2f-%.2f]!",
+                "ALERT: Wykryto dywergencję %s po dotknięciu FVG [%.2f-%.2f]!",
                 divergence.getDirection(), matchingFvg.getLowerPrice(), matchingFvg.getUpperPrice()
         );
 

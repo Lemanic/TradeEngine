@@ -30,6 +30,7 @@ public class DivergenceEntity {
 
     private ZonedDateTime detectedAt;
 
+
     protected DivergenceEntity() {}
 
     public DivergenceEntity(Long id,

@@ -5,6 +5,7 @@ import pl.tradeengine.domain.event.DomainEvent;
 import pl.tradeengine.domain.model.AlertToSend;
 import pl.tradeengine.domain.model.DivergenceSignal;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,7 +29,7 @@ public class SimpleDivergenceScenario implements Scenario {
                 signal.getDirection(),
                 name(),
                 signal.getTimeframe(),
-                0.0,
+                new BigDecimal(420),
                 Optional.empty(),
                 Optional.empty(),
                 "Divergence on " + signal.getTimeframe()

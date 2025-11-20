@@ -8,6 +8,8 @@ import pl.tradeengine.domain.model.FvgKind;
 import pl.tradeengine.domain.model.FvgStatus;
 import pl.tradeengine.domain.model.Timeframe;
 
+import java.math.BigDecimal;
+
 @Entity
 @Getter
 @Setter
@@ -26,8 +28,10 @@ public class FvgEntity {
     @Enumerated(EnumType.STRING)
     private Direction direction;
 
-    private Double lowerPrice;
-    private Double upperPrice;
+    @Column(precision = 19, scale = 4) // Dobra praktyka: zdefiniuj precyzję w bazie
+    private BigDecimal lowerPrice;
+    @Column(precision = 19, scale = 4)
+    private BigDecimal upperPrice;
     private Double strength;
 
     @Enumerated(EnumType.STRING)
@@ -38,7 +42,7 @@ public class FvgEntity {
 
     protected FvgEntity() {}
 
-    public FvgEntity(Long id, String symbol, Timeframe timeframe, Direction direction, Double lowerPrice, Double upperPrice, Double strength, FvgKind kind, FvgStatus status) {
+    public FvgEntity(Long id, String symbol, Timeframe timeframe, Direction direction, BigDecimal lowerPrice, BigDecimal upperPrice, Double strength, FvgKind kind, FvgStatus status) {
         this.id = id;
         this.symbol = symbol;
         this.timeframe = timeframe;

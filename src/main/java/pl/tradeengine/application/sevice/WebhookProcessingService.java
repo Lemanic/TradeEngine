@@ -14,6 +14,7 @@ import pl.tradeengine.domain.port.DivergenceRepository;
 import pl.tradeengine.domain.port.FvgRepository;
 import pl.tradeengine.domain.scenario.ScenarioEngine;
 
+import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import java.util.List;
 
@@ -57,29 +58,42 @@ public class WebhookProcessingService {
     }
 
     public void handlePriceUpdate(PriceUpdateDto dto) {
-        // --- NOWA LOGIKA ZARZĄDZANIA STANEM FVG ---
-        PriceCandle tempCandle = mapDtoToPriceCandle(dto); // Tworzymy tymczasowy obiekt świecy
+        PriceCandle tempCandle = mapDtoToPriceCandle(dto);
+
         List<FvgZone> intersectedFvgs = fvgRepository.findIntersectingOpenFvgs(
-                tempCandle.symbol(), tempCandle.timeframe(), tempCandle.close()
+                tempCandle.symbol(), tempCandle.low(), tempCandle.high()
         );
 
-        // Jeśli cena weszła w jakiś FVG o statusie CREATED, zmień jego status na TOUCHED
         for (FvgZone fvg : intersectedFvgs) {
-            fvgRepository.updateStatus(fvg.getId(), FvgStatus.TOUCHED);
-            log.info("FVG status updated to TOUCHED for id: {}", fvg.getId());
-        }
-        // --- KONIEC NOWEJ LOGIKI ---
+            if (fvg.getStatus() == FvgStatus.FILLED || fvg.getStatus() == FvgStatus.CONSUMED) {
+                continue;
+            }
 
-        // Ta część pozostaje bez zmian - wciąż wysyłamy event do silnika scenariuszy
+            boolean isFilled = false;
+
+            if (fvg.getDirection() == Direction.LONG && tempCandle.low().compareTo(fvg.getLowerPrice()) <= 0) {
+                isFilled = true;
+            }
+
+            else if (fvg.getDirection() == Direction.SHORT && tempCandle.high().compareTo(fvg.getUpperPrice()) >= 0) {
+                isFilled = true;
+            }
+
+            if (isFilled) {
+                fvgRepository.updateStatus(fvg.getId(), FvgStatus.FILLED);
+                log.info("FVG status updated to FILLED for id: {}", fvg.getId());
+            } else {
+                if (fvg.getStatus() == FvgStatus.CREATED) {
+                    fvgRepository.updateStatus(fvg.getId(), FvgStatus.TOUCHED);
+                    log.info("FVG status updated to TOUCHED for id: {}", fvg.getId());
+                }
+            }
+        }
         DomainEvent event = new PriceCandleEvent(tempCandle);
         log.info("Processing Price Update for symbol: {}", dto.symbol());
         process(event);
     }
 
-//    public void handlePriceUpdate(PriceUpdateDto dto) {
-//        DomainEvent event = mapToPriceUpdateEvent(dto);
-//        process(event);
-//    }
     private PriceCandle mapDtoToPriceCandle(PriceUpdateDto dto) {
         Symbol symbol = new Symbol(dto.symbol());
         Timeframe timeframe = Timeframe.fromCode(dto.timeframe());
@@ -89,13 +103,12 @@ public class WebhookProcessingService {
                 timeframe,
                 null,
                 null,
-                0.0,
+                new BigDecimal(69),
                 dto.currentHigh(),
                 dto.currentLow(),
                 dto.close()
     );
     }
-
 
     private void process(DomainEvent event) {
         List<AlertToSend> alerts = scenarioEngine.onEvent(event);

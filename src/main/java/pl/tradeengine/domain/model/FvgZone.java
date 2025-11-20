@@ -3,6 +3,8 @@ package pl.tradeengine.domain.model;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 @Getter
 @Setter
 public class FvgZone {
@@ -10,13 +12,13 @@ public class FvgZone {
     Symbol symbol;
     Timeframe timeframe;
     Direction direction;
-    Double lowerPrice;
-    Double upperPrice;
+    BigDecimal lowerPrice; // <-- ZMIEŃ TYP
+    BigDecimal upperPrice; // <-- ZMIEŃ TYP
     Double strength;
     FvgKind kind;
     FvgStatus status;
 
-    public FvgZone(Long id, Symbol symbol, Timeframe timeframe, Direction direction, Double lowerPrice, Double upperPrice, Double strength, FvgKind kind, FvgStatus status) {
+    public FvgZone(Long id, Symbol symbol, Timeframe timeframe, Direction direction, BigDecimal lowerPrice, BigDecimal upperPrice, Double strength, FvgKind kind, FvgStatus status) {
         this.id = id;
         this.symbol = symbol;
         this.timeframe = timeframe;

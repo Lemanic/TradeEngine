@@ -1,11 +1,13 @@
 package pl.tradeengine.application.dto;
 
+import java.math.BigDecimal;
+
 public record FvgAlertDto(
         String symbol,
         String timeframe,
         String signalType,
         String direction,
-        double fvgLow,
-        double fvgHigh,
+        BigDecimal fvgLow,
+        BigDecimal fvgHigh,
         String fvgStatus
 ) {}
