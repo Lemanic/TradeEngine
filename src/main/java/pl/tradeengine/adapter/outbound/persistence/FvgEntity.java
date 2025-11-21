@@ -28,7 +28,7 @@ public class FvgEntity {
     @Enumerated(EnumType.STRING)
     private Direction direction;
 
-    @Column(precision = 19, scale = 4) // Dobra praktyka: zdefiniuj precyzję w bazie
+    @Column(precision = 19, scale = 4)
     private BigDecimal lowerPrice;
     @Column(precision = 19, scale = 4)
     private BigDecimal upperPrice;
