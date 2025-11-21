@@ -4,18 +4,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import pl.tradeengine.domain.event.DivergenceDetectedEvent;
 import pl.tradeengine.domain.event.DomainEvent;
-import pl.tradeengine.domain.event.PriceCandleEvent;
 import pl.tradeengine.domain.model.*;
 import pl.tradeengine.domain.port.DivergenceRepository;
 import pl.tradeengine.domain.port.FvgRepository;
 
-import java.time.Duration;
-import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 
 @Slf4j
-@Component // Ważne, aby Spring go znalazł i dodał do ScenarioEngine!
+//@Component
 public class KeyLevelDivergenceScenario implements Scenario {
 
     private final FvgRepository fvgRepository;
@@ -33,7 +30,6 @@ public class KeyLevelDivergenceScenario implements Scenario {
 
     @Override
     public List<AlertToSend> onEvent(DomainEvent event) {
-        // Trigger wciąż ten sam - nowa dywergencja
         if (!(event instanceof DivergenceDetectedEvent divergenceEvent)) {
             return List.of();
         }
@@ -43,20 +39,14 @@ public class KeyLevelDivergenceScenario implements Scenario {
                 divergence.getSymbol(), divergence.getTimeframe()
         );
 
-        // --- NOWA, ULEPSZONA LOGIKA ---
-
-        // KROK 1: Znajdź pierwszy FVG, który ma ZGODNY KIERUNEK z dywergencją
         Optional<FvgZone> matchingFvgOpt = touchedFvgs.stream()
-                .filter(fvg -> fvg.getDirection() == divergence.getDirection()) // Sprawdzamy zgodność kierunków!
-                .findFirst(); // Bierzemy pierwszy pasujący
+                .filter(fvg -> fvg.getDirection() == divergence.getDirection())
+                .findFirst();
 
-        // KROK 2: Jeśli nie znaleziono pasującego FVG, zakończ pracę
         if (matchingFvgOpt.isEmpty()) {
             log.info("Divergence {} detected, but no matching FVG was found. No alert.", divergence.getDirection());
             return List.of();
         }
-
-        // --- WARUNKI SPEŁNIONE: MAMY DYWERGENCJĘ I PASUJĄCY, DOTKNIĘTY FVG! ---
 
         FvgZone matchingFvg = matchingFvgOpt.get();
 
@@ -76,7 +66,6 @@ public class KeyLevelDivergenceScenario implements Scenario {
                 description
         );
 
-        // KROK 3: "Zużyj" FVG, aby nie generować alertów w nieskończoność
         fvgRepository.updateStatus(matchingFvg.getId(), FvgStatus.CONSUMED);
         log.info("FVG with id {} has been consumed to generate an alert.", matchingFvg.getId());
 
