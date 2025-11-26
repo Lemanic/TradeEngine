@@ -7,7 +7,9 @@ public enum Timeframe {
     M15(Duration.ofMinutes(15)),
     H1(Duration.ofHours(1)),
     H4(Duration.ofHours(4)),
-    D1(Duration.ofHours(24));
+    H12(Duration.ofHours(12)),
+    D1(Duration.ofDays(1)),
+    W1(Duration.ofDays(7));
 
     public static Timeframe fromCode(String code) {
         return Timeframe.valueOf(code);

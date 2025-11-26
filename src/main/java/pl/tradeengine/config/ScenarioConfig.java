@@ -1,24 +1,26 @@
 package pl.tradeengine.config;
 
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import pl.tradeengine.domain.scenario.Scenario;
-import pl.tradeengine.domain.scenario.ScenarioEngine;
-import pl.tradeengine.domain.scenario.SimpleDivergenceScenario;
-
+import pl.tradeengine.domain.event.DivergenceDetectedEvent;
+import pl.tradeengine.domain.event.DomainEvent;
+import pl.tradeengine.domain.model.AlertToSend;
+import pl.tradeengine.domain.model.Timeframe;
 import java.util.List;
 
 @Configuration
 public class ScenarioConfig {
 
-//    @Bean
-//    public Scenario simpleDivergenceScenario() {
-//        return new SimpleDivergenceScenario();
-//    }
+    private final ScenarioRegistry scenarioRegistry;
 
-    @Bean
-    public ScenarioEngine scenarioEngine(List<Scenario> scenarios) {
-        return new ScenarioEngine(scenarios);
+    public ScenarioConfig(ScenarioRegistry scenarioRegistry) {
+        this.scenarioRegistry = scenarioRegistry;
+    }
+
+    public List<AlertToSend> handle(DomainEvent event) {
+        Timeframe tf = ((DivergenceDetectedEvent) event).signal().getTimeframe();
+        return scenarioRegistry.getScenariosFor(tf).stream()
+                .flatMap(s -> s.onEvent(event).stream())
+                .toList();
     }
 }
 
