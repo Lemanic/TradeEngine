@@ -14,11 +14,9 @@ import java.util.List;
 @Component
 public class ScenarioEngine {
 
-    private final List<Scenario> scenarios;
     private final ScenarioRegistry scenarioRegistry;
 
-    public ScenarioEngine(List<Scenario> scenarios, ScenarioRegistry scenarioRegistry) {
-        this.scenarios = List.copyOf(scenarios);
+    public ScenarioEngine(ScenarioRegistry scenarioRegistry) {
         this.scenarioRegistry = scenarioRegistry;
     }
 
