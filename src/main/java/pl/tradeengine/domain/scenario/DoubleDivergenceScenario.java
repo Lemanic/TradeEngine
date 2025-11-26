@@ -17,7 +17,7 @@ import java.util.Optional;
 @Component
 public class DoubleDivergenceScenario implements Scenario {
 
-    private static final int CANDLE_LOOKBACK_WINDOW = 30;
+    private static final int CANDLE_LOOKBACK_WINDOW = 35;
     private final DivergenceRepository divergenceRepository;
 
     public DoubleDivergenceScenario(DivergenceRepository divergenceRepository) {
@@ -79,4 +79,5 @@ public class DoubleDivergenceScenario implements Scenario {
         Duration totalLookback = timeframe.getDuration().multipliedBy(numberOfCandles);
         return ZonedDateTime.now().minus(totalLookback);
     }
+
 }

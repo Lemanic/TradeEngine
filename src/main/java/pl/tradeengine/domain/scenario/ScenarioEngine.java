@@ -1,26 +1,35 @@
 package pl.tradeengine.domain.scenario;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+import pl.tradeengine.config.ScenarioRegistry;
+import pl.tradeengine.domain.event.DivergenceDetectedEvent;
 import pl.tradeengine.domain.event.DomainEvent;
 import pl.tradeengine.domain.model.AlertToSend;
+import pl.tradeengine.domain.model.Timeframe;
 
 import java.util.List;
 
 @Slf4j
+@Component
 public class ScenarioEngine {
 
-    private final List<Scenario> scenarios;
+    private final ScenarioRegistry scenarioRegistry;
 
-    public ScenarioEngine(List<Scenario> scenarios) {
-        this.scenarios = List.copyOf(scenarios);
-        log.info("Active scenarios (strategies):");
-        this.scenarios.forEach(s -> log.info(" - {}", s.name()));
+    public ScenarioEngine(ScenarioRegistry scenarioRegistry) {
+        this.scenarioRegistry = scenarioRegistry;
     }
 
     public List<AlertToSend> onEvent(DomainEvent event) {
-        return scenarios.stream()
-                .map(s -> s.onEvent(event))
-                .flatMap(List::stream)
+        if (!(event instanceof DivergenceDetectedEvent divergenceEvent)) {
+            return List.of();
+        }
+
+        Timeframe timeframe = divergenceEvent.signal().getTimeframe();
+        var scenariosForTimeframe = scenarioRegistry.getScenariosFor(timeframe);
+
+        return scenariosForTimeframe.stream()
+                .flatMap(s -> s.onEvent(event).stream())
                 .toList();
     }
 }
