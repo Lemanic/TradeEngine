@@ -1,8 +1,12 @@
 package pl.tradeengine.domain.model;
 
+import lombok.Getter;
+
 import java.time.Duration;
 
+@Getter
 public enum Timeframe {
+    M3(Duration.ofMinutes(5)),
     M5(Duration.ofMinutes(5)),
     M15(Duration.ofMinutes(15)),
     H1(Duration.ofHours(1)),
@@ -19,5 +23,4 @@ public enum Timeframe {
 
     Timeframe(Duration duration) { this.duration = duration; }
 
-    public Duration getDuration() { return duration; }
 }
