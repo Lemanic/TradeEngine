@@ -4,7 +4,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import pl.tradeengine.domain.event.DivergenceDetectedEvent;
 import pl.tradeengine.domain.event.DomainEvent;
-import pl.tradeengine.domain.model.*;
+import pl.tradeengine.domain.model.AlertToSend;
+import pl.tradeengine.domain.model.DivergenceSignal;
+import pl.tradeengine.domain.model.Timeframe;
 import pl.tradeengine.domain.port.DivergenceRepository;
 
 import java.math.BigDecimal;
