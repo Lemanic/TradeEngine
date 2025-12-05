@@ -1,6 +1,10 @@
 package pl.tradeengine.domain.port;
 
-import pl.tradeengine.domain.model.*;
+import pl.tradeengine.domain.model.FvgStatus;
+import pl.tradeengine.domain.model.FvgZone;
+import pl.tradeengine.domain.model.Symbol;
+import pl.tradeengine.domain.model.Timeframe;
+import pl.tradeengine.domain.model.Direction;
 
 import java.math.BigDecimal;
 import java.util.List;

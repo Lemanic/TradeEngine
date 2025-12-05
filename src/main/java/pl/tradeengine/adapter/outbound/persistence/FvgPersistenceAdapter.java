@@ -1,7 +1,11 @@
 package pl.tradeengine.adapter.outbound.persistence;
 
 import org.springframework.stereotype.Repository;
-import pl.tradeengine.domain.model.*;
+import pl.tradeengine.domain.model.Direction;
+import pl.tradeengine.domain.model.FvgStatus;
+import pl.tradeengine.domain.model.FvgZone;
+import pl.tradeengine.domain.model.Symbol;
+import pl.tradeengine.domain.model.Timeframe;
 import pl.tradeengine.domain.port.FvgRepository;
 
 import java.math.BigDecimal;

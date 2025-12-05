@@ -4,7 +4,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import pl.tradeengine.domain.event.DivergenceDetectedEvent;
 import pl.tradeengine.domain.event.DomainEvent;
-import pl.tradeengine.domain.model.*;
+import pl.tradeengine.domain.model.AlertToSend;
+import pl.tradeengine.domain.model.Direction;
+import pl.tradeengine.domain.model.DivergenceSignal;
+import pl.tradeengine.domain.model.FvgStatus;
+import pl.tradeengine.domain.model.FvgZone;
+import pl.tradeengine.domain.model.Symbol;
+import pl.tradeengine.domain.model.Timeframe;
 import pl.tradeengine.domain.port.FvgRepository;
 
 import java.math.BigDecimal;
@@ -35,8 +41,6 @@ public class FvgKeyLevelDivergenceScenario implements Scenario {
         DivergenceSignal signal = divergenceEvent.signal();
         Symbol symbol = signal.getSymbol();
         Direction direction = signal.getDirection();
-
-        // od M5 w górę – na razie nie filtrujemy, bo chcesz testować wszystko
 
         List<FvgZone> candidateFvgs = fvgRepository
                 .findActiveForSymbolAndDirectionOnHigherTf(

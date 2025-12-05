@@ -18,5 +18,4 @@ public interface JpaDivergenceRepository extends JpaRepository<DivergenceEntity,
             String symbol, Timeframe timeframe, Direction direction, ZonedDateTime since
     );
 
-
 }
