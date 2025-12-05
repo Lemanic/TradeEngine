@@ -1,10 +1,7 @@
 package pl.tradeengine.adapter.outbound.persistence;
 
 import org.springframework.stereotype.Repository;
-import pl.tradeengine.domain.model.FvgStatus;
-import pl.tradeengine.domain.model.FvgZone;
-import pl.tradeengine.domain.model.Symbol;
-import pl.tradeengine.domain.model.Timeframe;
+import pl.tradeengine.domain.model.*;
 import pl.tradeengine.domain.port.FvgRepository;
 
 import java.math.BigDecimal;
@@ -80,4 +77,25 @@ public class FvgPersistenceAdapter implements FvgRepository {
                 .map(this::toDomain)
                 .toList();
     }
+
+    @Override
+    public List<FvgZone> findActiveForSymbolAndDirectionOnHigherTf(
+            Symbol symbol,
+            Direction direction,
+            List<FvgStatus> statuses,
+            List<Timeframe> timeframes
+    ) {
+        List<FvgEntity> entities = jpaRepository
+                .findBySymbolAndDirectionAndStatusInAndTimeframeIn(
+                        symbol.code(),
+                        direction,
+                        statuses,
+                        timeframes
+                );
+
+        return entities.stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
 }

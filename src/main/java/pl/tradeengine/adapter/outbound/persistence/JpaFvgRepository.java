@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import pl.tradeengine.domain.model.Direction;
 import pl.tradeengine.domain.model.FvgStatus;
 import pl.tradeengine.domain.model.Timeframe;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,18 @@ public interface JpaFvgRepository extends JpaRepository<FvgEntity, Long> {
             @Param("symbol") String symbol,
             @Param("low") BigDecimal low,
             @Param("high") BigDecimal high
+    );
+
+    @Query("SELECT f FROM FvgEntity f " +
+            "WHERE f.symbol = :symbol " +
+            "  AND f.direction = :direction " +
+            "  AND f.status IN :statuses " +
+            "  AND f.timeframe IN :timeframes")
+    List<FvgEntity> findBySymbolAndDirectionAndStatusInAndTimeframeIn(
+            @Param("symbol") String symbol,
+            @Param("direction") Direction direction,
+            @Param("statuses") List<FvgStatus> statuses,
+            @Param("timeframes") List<Timeframe> timeframes
     );
 
 }
