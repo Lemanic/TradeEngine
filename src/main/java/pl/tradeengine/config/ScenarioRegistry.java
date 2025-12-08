@@ -34,6 +34,15 @@ public class ScenarioRegistry {
                 .toList();
     }
 
+    public List<Scenario> getAllEnabledScenarios() {
+        return strategyProperties.getStrategies().stream()
+                .filter(StrategyProperties.StrategyConfig::isEnabled)
+                .map(cfg -> scenariosByName.get(cfg.getName()))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+
     @PostConstruct
     void logConfig() {
         log.info("Configured strategies (from YAML):");

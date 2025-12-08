@@ -21,14 +21,18 @@ public class ScenarioEngine {
     }
 
     public List<AlertToSend> onEvent(DomainEvent event) {
-        if (!(event instanceof DivergenceDetectedEvent divergenceEvent)) {
-            return List.of();
+        if (event instanceof DivergenceDetectedEvent divergenceEvent) {
+            Timeframe timeframe = divergenceEvent.signal().getTimeframe();
+            List<Scenario> scenariosForTimeframe = scenarioRegistry.getScenariosFor(timeframe);
+
+            return scenariosForTimeframe.stream()
+                    .flatMap(s -> s.onEvent(event).stream())
+                    .toList();
         }
 
-        Timeframe timeframe = divergenceEvent.signal().getTimeframe();
-        var scenariosForTimeframe = scenarioRegistry.getScenariosFor(timeframe);
+        List<Scenario> allEnabledScenarios = scenarioRegistry.getAllEnabledScenarios();
 
-        return scenariosForTimeframe.stream()
+        return allEnabledScenarios.stream()
                 .flatMap(s -> s.onEvent(event).stream())
                 .toList();
     }

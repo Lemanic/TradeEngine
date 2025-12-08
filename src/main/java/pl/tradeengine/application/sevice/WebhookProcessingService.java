@@ -8,6 +8,8 @@ import pl.tradeengine.application.dto.PriceUpdateDto;
 import pl.tradeengine.domain.event.DivergenceDetectedEvent;
 import pl.tradeengine.domain.event.DomainEvent;
 import pl.tradeengine.domain.event.FvgCreatedEvent;
+import pl.tradeengine.domain.event.FvgFilledEvent;
+import pl.tradeengine.domain.event.FvgTouchedEvent;
 import pl.tradeengine.domain.event.PriceCandleEvent;
 import pl.tradeengine.domain.model.AlertToSend;
 import pl.tradeengine.domain.model.Direction;
@@ -81,24 +83,56 @@ public class WebhookProcessingService {
 
             if (fvg.getDirection() == Direction.LONG && tempCandle.low().compareTo(fvg.getLowerPrice()) <= 0) {
                 isFilled = true;
-            }
-
-            else if (fvg.getDirection() == Direction.SHORT && tempCandle.high().compareTo(fvg.getUpperPrice()) >= 0) {
+            } else if (fvg.getDirection() == Direction.SHORT && tempCandle.high().compareTo(fvg.getUpperPrice()) >= 0) {
                 isFilled = true;
             }
 
             if (isFilled) {
                 fvgRepository.updateStatus(fvg.getId(), FvgStatus.FILLED);
                 log.info("FVG status updated to FILLED for id: {}", fvg.getId());
+
+                FvgZone filledFvg = new FvgZone(
+                        fvg.getId(),
+                        fvg.getSymbol(),
+                        fvg.getTimeframe(),
+                        fvg.getDirection(),
+                        fvg.getLowerPrice(),
+                        fvg.getUpperPrice(),
+                        fvg.getStrength(),
+                        fvg.getKind(),
+                        FvgStatus.FILLED
+                );
+
+                DomainEvent fvgFilledEvent = new FvgFilledEvent(filledFvg, ZonedDateTime.now());
+                log.info("Emitting FvgFilledEvent for FVG id={}", filledFvg.getId());
+                process(fvgFilledEvent);
+
             } else {
                 if (fvg.getStatus() == FvgStatus.CREATED) {
                     fvgRepository.updateStatus(fvg.getId(), FvgStatus.TOUCHED);
                     log.info("FVG status updated to TOUCHED for id: {}", fvg.getId());
+
+                    FvgZone touchedFvg = new FvgZone(
+                            fvg.getId(),
+                            fvg.getSymbol(),
+                            fvg.getTimeframe(),
+                            fvg.getDirection(),
+                            fvg.getLowerPrice(),
+                            fvg.getUpperPrice(),
+                            fvg.getStrength(),
+                            fvg.getKind(),
+                            FvgStatus.TOUCHED
+                    );
+
+                    DomainEvent fvgTouchedEvent = new FvgTouchedEvent(touchedFvg, ZonedDateTime.now());
+                    log.info("Emitting FvgTouchedEvent for FVG id={}", touchedFvg.getId());
+                    process(fvgTouchedEvent);
                 }
             }
         }
+
         DomainEvent event = new PriceCandleEvent(tempCandle);
-        log.info("Processing Price Update for symbol: {}", dto.symbol());
+        log.info("Processing Price Update for symbol: {}", dto.symbol()); // Hide it?
         process(event);
     }
 
