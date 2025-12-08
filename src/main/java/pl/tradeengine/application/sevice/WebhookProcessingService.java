@@ -8,6 +8,7 @@ import pl.tradeengine.application.dto.PriceUpdateDto;
 import pl.tradeengine.domain.event.DivergenceDetectedEvent;
 import pl.tradeengine.domain.event.DomainEvent;
 import pl.tradeengine.domain.event.FvgCreatedEvent;
+import pl.tradeengine.domain.event.FvgFilledEvent;
 import pl.tradeengine.domain.event.FvgTouchedEvent;
 import pl.tradeengine.domain.event.PriceCandleEvent;
 import pl.tradeengine.domain.model.AlertToSend;
@@ -89,6 +90,23 @@ public class WebhookProcessingService {
             if (isFilled) {
                 fvgRepository.updateStatus(fvg.getId(), FvgStatus.FILLED);
                 log.info("FVG status updated to FILLED for id: {}", fvg.getId());
+
+                FvgZone filledFvg = new FvgZone(
+                        fvg.getId(),
+                        fvg.getSymbol(),
+                        fvg.getTimeframe(),
+                        fvg.getDirection(),
+                        fvg.getLowerPrice(),
+                        fvg.getUpperPrice(),
+                        fvg.getStrength(),
+                        fvg.getKind(),
+                        FvgStatus.FILLED
+                );
+
+                DomainEvent fvgFilledEvent = new FvgFilledEvent(filledFvg, ZonedDateTime.now());
+                log.info("Emitting FvgFilledEvent for FVG id={}", filledFvg.getId());
+                process(fvgFilledEvent);
+
             } else {
                 if (fvg.getStatus() == FvgStatus.CREATED) {
                     fvgRepository.updateStatus(fvg.getId(), FvgStatus.TOUCHED);
