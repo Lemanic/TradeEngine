@@ -1,6 +1,6 @@
 spring:
   application:
-    version: "1.0.3"
+    version: "1.0.4"
   profiles:
     active: dev
 logging:
