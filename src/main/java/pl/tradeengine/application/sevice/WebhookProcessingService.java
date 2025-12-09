@@ -50,10 +50,10 @@ public class WebhookProcessingService {
 
         DomainEvent event = new FvgCreatedEvent(savedFvg);
 
-        log.info("Saved FVG id={}, symbol={}, tf={}", savedFvg.getId(), savedFvg.getSymbol().code(), savedFvg.getTimeframe());
+        log.info("Saved {} id={}, symbol={}, tf={}",savedFvg.getKind(), savedFvg.getId(), savedFvg.getSymbol().code(), savedFvg.getTimeframe());
         process(event);
 
-}
+    }
 
     public void handleDivergence(DivergenceAlertDto dto) {
         DivergenceSignal signal = mapDtoToDivergenceSignal(dto);
@@ -149,7 +149,7 @@ public class WebhookProcessingService {
                 dto.currentHigh(),
                 dto.currentLow(),
                 dto.close()
-    );
+        );
     }
 
     private void process(DomainEvent event) {
@@ -162,6 +162,7 @@ public class WebhookProcessingService {
         Timeframe timeframe = Timeframe.fromCode(dto.timeframe());
         Direction direction = Direction.fromSignal(dto.direction());
         FvgStatus status = FvgStatus.valueOf(dto.fvgStatus());
+        FvgKind kind = FvgKind.fromSignalType(dto.signalType());
 
         return new FvgZone(
                 null,
@@ -171,7 +172,7 @@ public class WebhookProcessingService {
                 dto.fvgLow(),
                 dto.fvgHigh(),
                 null,
-                FvgKind.FVG,
+                kind,
                 status
         );
     }
