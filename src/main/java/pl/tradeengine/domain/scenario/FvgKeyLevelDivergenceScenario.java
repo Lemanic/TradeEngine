@@ -63,14 +63,13 @@ public class FvgKeyLevelDivergenceScenario implements Scenario {
                         symbol,
                         direction,
                         List.of(FvgStatus.TOUCHED, FvgStatus.FILLED),
-                        List.of(Timeframe.H4, Timeframe.D1)
+                        List.of(Timeframe.H1, Timeframe.H4, Timeframe.D1)
                 );
 
         if (candidateFvgs.isEmpty()) {
             return List.of();
         }
 
-        // Na start bierzemy po prostu pierwsze dopasowane FVG
         FvgZone fvg = candidateFvgs.get(0);
 
         log.info(
