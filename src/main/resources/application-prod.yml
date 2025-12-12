@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/trade_engine_db
+    url: jdbc:postgresql://localhost:5432/postgres
     driver-class-name: org.postgresql.Driver
     username: ${DB_USER}
     password: ${DB_PASSWORD}
@@ -13,6 +13,9 @@ app:
     - name: DOUBLE_DIVERGENCE_STRATEGY
       enabled: true
       timeframes: [ H1, H4, D1 ]
+    - name: FVG_KEYLEVEL_DIVERGENCE_STRATEGY
+      enabled: true
+      timeframes: [ M5, M15, H1, H4 ]
   telegram:
     bot-token: ${TELEGRAM_BOT_TOKEN}
     chat-id: ${TELEGRAM_CHAT_ID}
