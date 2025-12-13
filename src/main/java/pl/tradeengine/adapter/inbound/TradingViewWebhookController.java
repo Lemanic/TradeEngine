@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RestController;
 import pl.tradeengine.application.dto.DivergenceAlertDto;
 import pl.tradeengine.application.dto.FvgAlertDto;
 import pl.tradeengine.application.dto.PriceUpdateDto;
-import pl.tradeengine.application.sevice.WebhookProcessingService;
+import pl.tradeengine.application.service.WebhookProcessingService;
 
 @RestController
 @RequestMapping("/webhooks")

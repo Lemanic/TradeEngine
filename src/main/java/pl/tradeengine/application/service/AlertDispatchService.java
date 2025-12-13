@@ -1,4 +1,4 @@
-package pl.tradeengine.application.sevice;
+package pl.tradeengine.application.service;
 
 import org.springframework.stereotype.Service;
 import pl.tradeengine.domain.model.AlertToSend;
