@@ -176,7 +176,7 @@ public class WebhookProcessingService {
         }
 
         DomainEvent event = new PriceCandleEvent(tempCandle);
-        log.info("Processing Price Update for symbol: {}", dto.symbol()); // Hide it?
+//        log.info("Processing Price Update for symbol: {}", dto.symbol()); // Hide it?
         process(event);
     }
 
