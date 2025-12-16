@@ -11,6 +11,7 @@ import pl.tradeengine.domain.event.FvgCreatedEvent;
 import pl.tradeengine.domain.event.FvgFilledEvent;
 import pl.tradeengine.domain.event.FvgTouchedEvent;
 import pl.tradeengine.domain.event.PriceCandleEvent;
+import pl.tradeengine.domain.model.AlertMode;
 import pl.tradeengine.domain.model.AlertToSend;
 import pl.tradeengine.domain.model.Direction;
 import pl.tradeengine.domain.model.DivergenceSignal;
@@ -35,6 +36,10 @@ public class WebhookProcessingService {
     private final AlertDispatchService alertDispatchService;
     private final FvgRepository fvgRepository;
     private final DivergenceRepository divergenceRepository;
+
+    private static final int X_OUTSIDE_CANDLES_TO_PAUSE = 4;
+    private static final int Y_AFTER_FILLED_TO_EXPIRE   = 5;
+
 
     public WebhookProcessingService(ScenarioEngine scenarioEngine, AlertDispatchService alertDispatchService, FvgRepository fvgRepository, DivergenceRepository divergenceRepository) {
         this.scenarioEngine = scenarioEngine;
@@ -74,6 +79,42 @@ public class WebhookProcessingService {
                 tempCandle.symbol(), tempCandle.low(), tempCandle.high()
         );
 
+        ZonedDateTime now = ZonedDateTime.now();
+        int consumed = fvgRepository.consumeExpiredFilled(now);
+
+        List<FvgZone> touchedHtf = fvgRepository.findTouchedForSymbolOnTimeframes(
+                tempCandle.symbol(),
+                List.of(Timeframe.H1, Timeframe.H4, Timeframe.D1)
+        );
+
+        for (FvgZone fvg : touchedHtf) {
+            boolean inZone = candleIntersectsFvg(tempCandle, fvg);
+
+            if (inZone) {
+                if (fvg.getLeftZoneAt() != null || fvg.getAlertMode() == AlertMode.PAUSED) {
+                    fvgRepository.resumeArmed(fvg.getId());
+                }
+                continue;
+            }
+
+            if (fvg.getLeftZoneAt() == null) {
+                fvgRepository.setLeftZoneAt(fvg.getId(), now);
+                continue;
+            }
+
+            ZonedDateTime pauseAt = fvg.getLeftZoneAt()
+                    .plus(fvg.getTimeframe().getDuration().multipliedBy(X_OUTSIDE_CANDLES_TO_PAUSE));
+
+            if (now.isAfter(pauseAt) && fvg.getAlertMode() != AlertMode.PAUSED) {
+                fvgRepository.setAlertMode(fvg.getId(), AlertMode.PAUSED);
+            }
+        }
+
+
+        if (consumed > 0) {
+            log.info("Consumed {} expired filled FVGs", consumed);
+        }
+
         for (FvgZone fvg : intersectedFvgs) {
             if (fvg.getStatus() == FvgStatus.FILLED || fvg.getStatus() == FvgStatus.CONSUMED) {
                 continue;
@@ -88,7 +129,9 @@ public class WebhookProcessingService {
             }
 
             if (isFilled) {
-                fvgRepository.updateStatus(fvg.getId(), FvgStatus.FILLED);
+                ZonedDateTime expiresAt = now.plus(fvg.getTimeframe().getDuration().multipliedBy(Y_AFTER_FILLED_TO_EXPIRE));
+                fvgRepository.markFilled(fvg.getId(), now, expiresAt);
+
                 log.info("FVG status updated to FILLED for id: {}", fvg.getId());
 
                 FvgZone filledFvg = new FvgZone(
@@ -103,13 +146,14 @@ public class WebhookProcessingService {
                         FvgStatus.FILLED
                 );
 
-                DomainEvent fvgFilledEvent = new FvgFilledEvent(filledFvg, ZonedDateTime.now());
+                DomainEvent fvgFilledEvent = new FvgFilledEvent(filledFvg, now);
                 log.info("Emitting FvgFilledEvent for FVG id={}", filledFvg.getId());
                 process(fvgFilledEvent);
 
             } else {
                 if (fvg.getStatus() == FvgStatus.CREATED) {
-                    fvgRepository.updateStatus(fvg.getId(), FvgStatus.TOUCHED);
+                    fvgRepository.markTouched(fvg.getId(), now);
+
                     log.info("FVG status updated to TOUCHED for id: {}", fvg.getId());
 
                     FvgZone touchedFvg = new FvgZone(
@@ -124,7 +168,7 @@ public class WebhookProcessingService {
                             FvgStatus.TOUCHED
                     );
 
-                    DomainEvent fvgTouchedEvent = new FvgTouchedEvent(touchedFvg, ZonedDateTime.now());
+                    DomainEvent fvgTouchedEvent = new FvgTouchedEvent(touchedFvg, now);
                     log.info("Emitting FvgTouchedEvent for FVG id={}", touchedFvg.getId());
                     process(fvgTouchedEvent);
                 }
@@ -195,6 +239,11 @@ public class WebhookProcessingService {
 
     private double calculateStrengthBasedOnContext(DivergenceAlertDto dto) {
         return 21.37;
+    }
+
+    private boolean candleIntersectsFvg(PriceCandle candle, FvgZone fvg) {
+        return candle.high().compareTo(fvg.getLowerPrice()) >= 0
+                && candle.low().compareTo(fvg.getUpperPrice()) <= 0;
     }
 
 }

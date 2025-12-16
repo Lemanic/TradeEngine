@@ -10,12 +10,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import pl.tradeengine.domain.model.AlertMode;
 import pl.tradeengine.domain.model.Direction;
 import pl.tradeengine.domain.model.FvgKind;
 import pl.tradeengine.domain.model.FvgStatus;
 import pl.tradeengine.domain.model.Timeframe;
 
 import java.math.BigDecimal;
+import java.time.ZonedDateTime;
 
 @Entity
 @Getter
@@ -46,6 +48,15 @@ public class FvgEntity {
 
     @Enumerated(EnumType.STRING)
     private FvgStatus status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private AlertMode alertMode = AlertMode.OFF;
+
+    private ZonedDateTime touchedAt;
+    private ZonedDateTime leftZoneAt;
+    private ZonedDateTime filledAt;
+    private ZonedDateTime expiresAt;
 
     protected FvgEntity() {}
 
