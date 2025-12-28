@@ -26,10 +26,7 @@ public class AlertToSend {
 
     @Override
     public String toString() {
-        return String.format(
-                "ALERT! %s, %s, %s, TF=%s",
-                description, symbol.code(), direction, timeframe
-        );
+        return description;
     }
 
 }
