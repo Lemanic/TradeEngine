@@ -83,12 +83,14 @@ public class FvgKeyLevelDivergenceScenario implements Scenario {
         );
 
         String description = String.format(
-                "Dywergencja %s na TF %s w kontekście FVG (%s, %s) na TF %s (%.4f - %.4f).",
+                "DIV+FVG | %s | %s | DIV %s | %s %s %s | SCORE %s/10 | %s-%s",
+                symbol.code(),
                 direction,
                 signal.getTimeframe(),
                 fvg.getKind(),
-                fvg.getStatus(),
                 fvg.getTimeframe(),
+                fvg.getStatus(),
+                6.9,
                 fvg.getLowerPrice(),
                 fvg.getUpperPrice()
         );

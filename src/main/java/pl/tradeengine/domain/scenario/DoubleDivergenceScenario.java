@@ -52,8 +52,12 @@ public class DoubleDivergenceScenario implements Scenario {
                     recentDivergences.size(), newDivergence.getSymbol().code(), newDivergence.getTimeframe());
 
             String description = String.format(
-                    "Wykryto podwójną dywergencję %s na interwale %s! (Liczba sygnałów: %d)",
-                    newDivergence.getDirection(), newDivergence.getTimeframe(), recentDivergences.size()
+                    "DoubleDiv | %s | %s | TF %s | SCORE %s/10 | x%s",
+                    newDivergence.getSymbol().code(),
+                    newDivergence.getDirection(),
+                    newDivergence.getTimeframe(),
+                    6.9,
+                    recentDivergences.size()
             );
 
             AlertToSend alert = new AlertToSend(
