@@ -26,6 +26,7 @@ import java.util.Optional;
 public class FvgKeyLevelDivergenceScenario implements Scenario {
 
     private static final int PRE_TOUCH_LOOKBACK_CANDLES = 10;
+    private static final int DOUBLE_DIV_LOOKBACK_CANDLES = 35;
 
     private final FvgRepository fvgRepository;
     private final DivergenceRepository divergenceRepository;
@@ -57,6 +58,14 @@ public class FvgKeyLevelDivergenceScenario implements Scenario {
         DivergenceSignal signal = divergenceEvent.signal();
         Symbol symbol = signal.getSymbol();
         Direction direction = signal.getDirection();
+
+        if (signal.getTimeframe() == Timeframe.M5) {
+            if (!isDoubleDivergence(signal, DOUBLE_DIV_LOOKBACK_CANDLES)) {
+                log.debug("M5 divergence detected but not double - skipping. Symbol: {}, Dir: {}",
+                        symbol.code(), direction);
+                return List.of();
+            }
+        }
 
         List<FvgZone> candidateFvgs = fvgRepository
                 .findActiveForSymbolAndDirectionOnHigherTf(
@@ -172,6 +181,20 @@ public class FvgKeyLevelDivergenceScenario implements Scenario {
         );
 
         return List.of(alert);
+    }
+
+    private boolean isDoubleDivergence(DivergenceSignal signal, int candleLookback) {
+        ZonedDateTime lookbackTime = signal.getDetectedAt()
+                .minus(signal.getTimeframe().getDuration().multipliedBy(candleLookback));
+
+        List<DivergenceSignal> recentDivergences = divergenceRepository.findAllByDirectionSince(
+                signal.getSymbol(),
+                signal.getTimeframe(),
+                signal.getDirection(),
+                lookbackTime
+        );
+
+        return recentDivergences.size() > 1;
     }
 
     @Override
