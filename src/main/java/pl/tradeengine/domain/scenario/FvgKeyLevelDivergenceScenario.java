@@ -156,7 +156,7 @@ public class FvgKeyLevelDivergenceScenario implements Scenario {
                 fvg.getId(),
                 lastDiv.getDetectedAt()
         );
-//        PRE-TOUCH | XLMUSDT.P | LONG | DIV M15 | FVG H1 TOUCHED | PRE 10 BARS | 0.0156-0.0158
+
         String description = String.format(
                 "PRE-TOUCH | %s | %s | DIV %s | %s %s %s | %s-%s",
                 fvg.getSymbol().code(),
