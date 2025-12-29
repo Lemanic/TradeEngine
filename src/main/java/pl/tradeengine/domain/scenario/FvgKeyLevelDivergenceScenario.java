@@ -156,15 +156,15 @@ public class FvgKeyLevelDivergenceScenario implements Scenario {
                 fvg.getId(),
                 lastDiv.getDetectedAt()
         );
-
+//        PRE-TOUCH | XLMUSDT.P | LONG | DIV M15 | FVG H1 TOUCHED | PRE 10 BARS | 0.0156-0.0158
         String description = String.format(
-                "PRE-TOUCH: Dywergencja %s na TF %s wykryta w ciągu %d świec przed dotknięciem FVG (%s, %s) na TF %s (%.4f - %.4f).",
+                "PRE-TOUCH | %s | %s | DIV %s | %s %s %s | %s-%s",
+                fvg.getSymbol().code(),
                 lastDiv.getDirection(),
                 lastDiv.getTimeframe(),
-                PRE_TOUCH_LOOKBACK_CANDLES,
                 fvg.getKind(),
-                fvg.getStatus(),
                 fvg.getTimeframe(),
+                fvg.getStatus(),
                 fvg.getLowerPrice(),
                 fvg.getUpperPrice()
         );
