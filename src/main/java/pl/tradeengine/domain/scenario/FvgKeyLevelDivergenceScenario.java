@@ -16,7 +16,6 @@ import pl.tradeengine.domain.port.DivergenceRepository;
 import pl.tradeengine.domain.port.FvgRepository;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
