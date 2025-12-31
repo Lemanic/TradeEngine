@@ -37,9 +37,9 @@ public class FvgEntity {
     @Enumerated(EnumType.STRING)
     private Direction direction;
 
-    @Column(precision = 19, scale = 4)
+    @Column(precision = 32, scale = 16)
     private BigDecimal lowerPrice;
-    @Column(precision = 19, scale = 4)
+    @Column(precision = 32, scale = 16)
     private BigDecimal upperPrice;
     private Double strength;
 
