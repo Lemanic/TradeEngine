@@ -14,6 +14,7 @@ import pl.tradeengine.domain.model.Symbol;
 import pl.tradeengine.domain.model.Timeframe;
 import pl.tradeengine.domain.port.DivergenceRepository;
 import pl.tradeengine.domain.port.FvgRepository;
+import pl.tradeengine.domain.util.PriceFormatter;
 
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
@@ -99,8 +100,8 @@ public class FvgKeyLevelDivergenceScenario implements Scenario {
                 fvg.getTimeframe(),
                 fvg.getStatus(),
                 6.9,
-                fvg.getLowerPrice(),
-                fvg.getUpperPrice()
+                PriceFormatter.format(fvg.getLowerPrice()),
+                PriceFormatter.format(fvg.getUpperPrice())
         );
 
         AlertToSend alert = new AlertToSend(
@@ -164,8 +165,8 @@ public class FvgKeyLevelDivergenceScenario implements Scenario {
                 fvg.getKind(),
                 fvg.getTimeframe(),
                 fvg.getStatus(),
-                fvg.getLowerPrice(),
-                fvg.getUpperPrice()
+                PriceFormatter.format(fvg.getLowerPrice()),
+                PriceFormatter.format(fvg.getUpperPrice())
         );
 
         AlertToSend alert = new AlertToSend(
