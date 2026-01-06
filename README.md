@@ -2,7 +2,7 @@
 
 [![Project Status: Active Development](https://img.shields.io/badge/Status-Active_Development-yellow)]()
 [![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://www.oracle.com/java/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2-green.svg)](https://spring.io/projects/spring-boot)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5-green.svg)](https://spring.io/projects/spring-boot)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -43,18 +43,26 @@ graph LR
 *   **Real-time Processing:** Asynchronous webhook handling via Cloudflare Tunnel for minimal latency.
 *   **Secure Ingress:** Zero Trust network configuration preventing public IP exposure.
 
-## 🧠 Implemented Strategy Logic
+## 🧠 Strategy Logic & Algorithms
 
-The system operates on a **Dynamic Multi-Timeframe (MTF) Correlation Engine**. It continuously monitors market data across five intervals (M5, M15, H1, H4, D1) to identify high-probability setups based on the **Context + Trigger** model:
+The system operates on a **Dynamic Multi-Timeframe (MTF) Correlation Engine**. It currently implements two core strategies based on the **Context + Trigger** model:
 
-*   **HTF Context Identification:** The engine first locates structural elements on higher timeframes (e.g., **H4 Fair Value Gap** or **D1 Bias**).
-*   **LTF Precision Entry:** Once price reaches the HTF zone, the system listens for specific confirmation patterns on lower timeframes (e.g., **M15 RSI Divergence**) to trigger the alert.
+### 1. The "Multi-Divergence" Strategy
+A pure momentum strategy that seeks exhaustion in trend on higher timeframes.
+*   **Logic:** Continuously scans for **multiple divergences** (at least double) on key intervals (**H1, H4, D1**).
+*   **Trigger:** Alerts are generated only when a divergence stack (e.g., Triple Bearish Divergence) is confirmed.
+*   **Alert Metadata:** The system classifies signal strength by divergence count (e.g., `x2`, `x3` strength) to prioritize stronger reversal signals.
+
+### 2. FVG + Divergence Confluence
+A "Return to Value" strategy based on **Smart Money Concepts (SMC)**.
+*   **HTF Context:** Identifies structural imbalance (**Fair Value Gap**) on **H1/H4/D1**.
+*   **LTF Precision Entry:** Waits for price to mitigate the FVG zone. Once inside, the system listens for a confirmation trigger (e.g., **M15 RSI Divergence**) before alerting.
 
 *Example workflow: H4 Bearish FVG detected -> Wait for Price Revisit -> M15 Bearish Divergence confirmed -> 🚨 Alert Sent.*
 
-### 🧩 Signal Generation (Pine Script)
+### 🧩 Signal Generation
 
-Unlike generic signal parsers, this system is tightly integrated with custom trading algorithms written in **Pine Script v5**.
+The system functionality relies on **proprietary algorithms** developed in **Pine Script v5** (hosted on TradingView). Unlike generic parsers, the backend is tuned to process specific, pre-validated payloads containing rich metadata (e.g., divergence strength, FVG coordinates) rather than simple trigger alerts.
 
 ## 📸 Live Signal Example
 
@@ -66,7 +74,7 @@ Unlike generic signal parsers, this system is tightly integrated with custom tra
 
 ### Core Backend
 *   **Language:** Java 21 (LTS) - utilizing Records and Pattern Matching.
-*   **Framework:** Spring Boot 3.5.7 (Web, Data JPA).
+*   **Framework:** Spring Boot 3.5 (Web, Data JPA).
 *   **Database:** PostgreSQL.
 *   **Tools:** Lombok, Maven.
 
@@ -81,9 +89,23 @@ Unlike generic signal parsers, this system is tightly integrated with custom tra
 
 ## 🚧 Roadmap & Future Improvements
 
-The project is currently in **Active Development (Alpha Stage)**.
+The project is continuously evolving from a signal provider into a full-stack trading platform.
 
-### Q1 2026 Priorities:
-- [ ] **DevOps Transformation:** Containerization (Docker) and CI/CD pipelines (GitHub Actions).
-- [ ] **Automated Execution:** Integration with Exchange APIs (Binance/Bybit) for auto-trading.
-- [ ] **Backtesting Module:** Simulation of strategies on historical data.
+### 🔹 Core Execution & Risk Management
+- [ ] **Exchange Integration:** Connector implementation for **Bybit** and **Hyperliquid** APIs.
+- [ ] **Smart Risk Engine:** Automated position sizing based on Account Equity % and dynamic Stop Loss levels.
+- [ ] **Trade Management:** Logic for Breakeven triggers, Trailing Stops, and Partial Take Profits.
+
+### 🔹 Strategies & Backtesting
+- [ ] **Backtesting Engine:** Simulation module to validate strategies against historical data before deployment.
+- [ ] **Strategy Versioning:** Mechanism to manage multiple versions of strategy logic (e.g., `v1.0` vs `v1.2`) simultaneously.
+- [ ] **Dynamic Parameterization:** Ability to adjust strategy thresholds (e.g., RSI periods, FVG depth) without redeploying code.
+
+### 🔹 UI & Analytics (Web Dashboard)
+- [ ] **Admin Dashboard:** A graphical interface to toggle active strategies and manage configuration.
+- [ ] **Performance Analytics:** Visualization of Win Rate, Profit Factor, and Drawdown curves.
+- [ ] **Signal History:** Searchable table of all past alerts and their outcomes.
+
+### 🔹 DevOps & Infrastructure
+- [ ] **Dockerization:** Full containerization of the Spring Boot app and PostgreSQL database.
+- [ ] **CI/CD Pipeline:** GitHub Actions workflows for automated testing and building.
