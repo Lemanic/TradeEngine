@@ -23,18 +23,18 @@ graph LR
     
     subgraph TradeEngine Core
     B --> C{Strategy Engine}
-    C -->|Validate Context| D[Risk Management]
-    D -->|Persist Event| E[(PostgreSQL)]
+    C -->|Log Signal| E[(PostgreSQL)]
     end
     
     subgraph Output Adapters
-    D -->|Notification| F[Telegram Bot]
-    D -.->|Order Execution| G[Exchange API]
+    C -->|Format & Send| F[Telegram Bot]
+    C -.->|Future Execution| G[Exchange API]
     end
     
     style A fill:#f9f,stroke:#333,stroke-width:2px
     style B fill:#bbf,stroke:#333,stroke-width:2px
     style E fill:#bfb,stroke:#333,stroke-width:2px
+
 ```
 ## 🚀 Key Features
 
