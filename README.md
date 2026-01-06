@@ -1,4 +1,4 @@
-# TradeEngine - Automated Crypto Trading Bot based on Advanced Price Action
+# TradeEngine - Automated Crypto Trading Bot based on Price Action
 
 [![Project Status: Active Development](https://img.shields.io/badge/Status-Active_Development-yellow)]()
 [![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://www.oracle.com/java/)
