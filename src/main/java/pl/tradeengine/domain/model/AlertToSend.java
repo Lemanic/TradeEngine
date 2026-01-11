@@ -9,11 +9,11 @@ public class AlertToSend {
     String scenarioName;
     Timeframe timeframe;
     BigDecimal entryPrice;
-    Optional<Double> stopLoss;
-    Optional<Double> takeProfit;
+    Optional<BigDecimal> stopLoss;
+    Optional<BigDecimal> takeProfit;
     String description;
 
-    public AlertToSend(Symbol symbol, Direction direction, String scenarioName, Timeframe timeframe, BigDecimal entryPrice, Optional<Double> stopLoss, Optional<Double> takeProfit, String description) {
+    public AlertToSend(Symbol symbol, Direction direction, String scenarioName, Timeframe timeframe, BigDecimal entryPrice, Optional<BigDecimal> stopLoss, Optional<BigDecimal> takeProfit, String description) {
         this.symbol = symbol;
         this.direction = direction;
         this.scenarioName = scenarioName;

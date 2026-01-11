@@ -2,17 +2,21 @@ package pl.tradeengine.application.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import pl.tradeengine.application.dto.BiasAlertDto;
 import pl.tradeengine.application.dto.DivergenceAlertDto;
 import pl.tradeengine.application.dto.FvgAlertDto;
 import pl.tradeengine.application.dto.PriceUpdateDto;
+import pl.tradeengine.application.dto.SwingPointDto;
 import pl.tradeengine.domain.event.DivergenceDetectedEvent;
 import pl.tradeengine.domain.event.DomainEvent;
 import pl.tradeengine.domain.event.FvgCreatedEvent;
 import pl.tradeengine.domain.event.FvgFilledEvent;
 import pl.tradeengine.domain.event.FvgTouchedEvent;
 import pl.tradeengine.domain.event.PriceCandleEvent;
+import pl.tradeengine.domain.event.SwingPointDetectedEvent;
 import pl.tradeengine.domain.model.AlertMode;
 import pl.tradeengine.domain.model.AlertToSend;
+import pl.tradeengine.domain.model.BiasStatus;
 import pl.tradeengine.domain.model.Direction;
 import pl.tradeengine.domain.model.DivergenceSignal;
 import pl.tradeengine.domain.model.FvgKind;
@@ -21,8 +25,10 @@ import pl.tradeengine.domain.model.FvgZone;
 import pl.tradeengine.domain.model.PriceCandle;
 import pl.tradeengine.domain.model.Symbol;
 import pl.tradeengine.domain.model.Timeframe;
+import pl.tradeengine.domain.port.BiasRepository;
 import pl.tradeengine.domain.port.DivergenceRepository;
 import pl.tradeengine.domain.port.FvgRepository;
+import pl.tradeengine.domain.port.SwingPointRepository;
 import pl.tradeengine.domain.scenario.ScenarioEngine;
 
 import java.math.BigDecimal;
@@ -36,16 +42,20 @@ public class WebhookProcessingService {
     private final AlertDispatchService alertDispatchService;
     private final FvgRepository fvgRepository;
     private final DivergenceRepository divergenceRepository;
+    private final BiasRepository biasRepository;
+    private final SwingPointRepository swingPointRepository;
 
     private static final int X_OUTSIDE_CANDLES_TO_PAUSE = 4;
     private static final int Y_AFTER_FILLED_TO_EXPIRE   = 5;
 
 
-    public WebhookProcessingService(ScenarioEngine scenarioEngine, AlertDispatchService alertDispatchService, FvgRepository fvgRepository, DivergenceRepository divergenceRepository) {
+    public WebhookProcessingService(ScenarioEngine scenarioEngine, AlertDispatchService alertDispatchService, FvgRepository fvgRepository, DivergenceRepository divergenceRepository, BiasRepository biasRepository, SwingPointRepository swingPointRepository) {
         this.scenarioEngine = scenarioEngine;
         this.alertDispatchService = alertDispatchService;
         this.fvgRepository = fvgRepository;
         this.divergenceRepository = divergenceRepository;
+        this.biasRepository = biasRepository;
+        this.swingPointRepository = swingPointRepository;
     }
 
     public void handleFvg(FvgAlertDto dto) {
@@ -71,6 +81,24 @@ public class WebhookProcessingService {
         process(event);
 
     }
+
+    public void handleBiasUpdate(BiasAlertDto dto) {
+        Symbol symbol = new Symbol(dto.symbol());
+        Timeframe timeframe = Timeframe.fromCode(dto.timeframe());
+
+        BiasStatus status;
+        try {
+            status = BiasStatus.valueOf(dto.biasStatus().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Unknown Bias Status: " + dto.biasStatus());
+        }
+        String reason = "TV_WEBHOOK";
+
+        log.info("📢 BIAS UPDATE: {} on {} changed to {}", symbol.code(), timeframe, status);
+
+        biasRepository.updateBias(symbol, timeframe, status, reason);
+    }
+
 
     public void handlePriceUpdate(PriceUpdateDto dto) {
         PriceCandle tempCandle = mapDtoToPriceCandle(dto);
@@ -244,6 +272,19 @@ public class WebhookProcessingService {
     private boolean candleIntersectsFvg(PriceCandle candle, FvgZone fvg) {
         return candle.high().compareTo(fvg.getLowerPrice()) >= 0
                 && candle.low().compareTo(fvg.getUpperPrice()) <= 0;
+    }
+
+    public void handleSwingPoint(SwingPointDto dto) {
+        Symbol symbol = new Symbol(dto.symbol());
+        Timeframe tf = Timeframe.fromCode(dto.timeframe());
+        ZonedDateTime now = ZonedDateTime.now();
+
+        swingPointRepository.save(symbol, tf, dto.type(), dto.price(), now);
+
+        SwingPointDetectedEvent event = new SwingPointDetectedEvent(
+                symbol, tf, dto.type(), dto.price(), now
+        );
+        process(event);
     }
 
 }
