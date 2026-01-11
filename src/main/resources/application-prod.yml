@@ -16,6 +16,12 @@ app:
     - name: FVG_KEYLEVEL_DIVERGENCE_STRATEGY
       enabled: true
       timeframes: [ H1, H4 ]
+    - name: "GRINDER_SWING_D1_H1"
+      enabled: true
+      timeframes: [ H1 ]
+    - name: "GRINDER_POSITION_W1_H4"
+      enabled: true
+      timeframes: [ H4 ]
   telegram:
     bot-token: ${TELEGRAM_BOT_TOKEN}
     chat-id: ${TELEGRAM_CHAT_ID}
