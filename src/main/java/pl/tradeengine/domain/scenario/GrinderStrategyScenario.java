@@ -131,21 +131,33 @@ public class GrinderStrategyScenario implements Scenario {
     }
 
     private List<AlertToSend> generateAlert(Symbol symbol, Direction dir, FvgZone fvg, java.math.BigDecimal entryPrice, String method) {
+        boolean isLong = (dir == Direction.LONG);
+        String directionText = isLong ? "LONG" : "SHORT";
+        String emoji = isLong ? "🟢" : "🔴";
+        String biasDirection = isLong ? "BULL" : "BEAR";
+
+        //TODO refactor this method
+        String scenarioTag;
+        if (method.toLowerCase().contains("late")) {
+            scenarioTag = "LATE FVG";
+        } else if (method.toLowerCase().contains("swing")) {
+            scenarioTag = "SWING";
+        } else {
+            scenarioTag = method.toUpperCase();
+        }
+
         String description = String.format(
-                "🚀 GRINDER SETUP (%s)\n" +
-                        "Pair: %s\n" +
-                        "Strategy: %s\n" +
-                        "Bias: %s\n" +
-                        "Zone: %s FVG [%s - %s]\n" +
-                        "Entry: %s",
-                method,
+                "🚀 GRINDER (%s) | %s | %s %s\n" +
+                        "BIAS %s %s | FVG %s [%s-%s]",
+                scenarioTag,
                 symbol.code(),
-                strategyName,
+                directionText,
+                emoji,
                 biasTimeframe,
+                biasDirection,
                 fvg.getTimeframe(),
                 PriceFormatter.format(fvg.getLowerPrice()),
-                PriceFormatter.format(fvg.getUpperPrice()),
-                PriceFormatter.format(entryPrice)
+                PriceFormatter.format(fvg.getUpperPrice())
         );
 
         return List.of(new AlertToSend(
