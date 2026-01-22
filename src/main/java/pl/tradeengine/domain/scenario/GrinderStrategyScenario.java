@@ -1,10 +1,10 @@
 package pl.tradeengine.domain.scenario;
 
 import lombok.extern.slf4j.Slf4j;
-import pl.tradeengine.application.dto.SwingPointDto;
 import pl.tradeengine.domain.event.DomainEvent;
 import pl.tradeengine.domain.event.FvgTouchedEvent;
 import pl.tradeengine.domain.event.SwingPointDetectedEvent;
+import pl.tradeengine.domain.event.FvgFilledEvent;
 import pl.tradeengine.domain.model.*;
 import pl.tradeengine.domain.port.BiasRepository;
 import pl.tradeengine.domain.port.FvgRepository;
@@ -61,8 +61,58 @@ public class GrinderStrategyScenario implements Scenario {
             return handleFvgTouchTrigger(fvgEvent);
         }
 
+        if (event instanceof FvgFilledEvent fvgEvent) {
+            return handleFvgInteraction(fvgEvent.fvgZone(), fvgEvent.filledAt());
+        }
+
         return List.of();
     }
+
+    private List<AlertToSend> handleFvgInteraction(FvgZone fvg, ZonedDateTime interactionTime) {
+        Symbol symbol = fvg.getSymbol();
+
+        // 1. Czy FVG jest na obserwowanym interwale?
+        if (!poiTimeframes.contains(fvg.getTimeframe())) return List.of();
+
+        // 2. Czy BIAS jest zgodny z kierunkiem FVG?
+        BiasStatus currentBias = biasRepository.getBias(symbol, biasTimeframe);
+        Direction tradeDirection = resolveDirectionFromBias(currentBias);
+
+        if (tradeDirection != fvg.getDirection()) return List.of();
+
+        String expectedSwingType = (tradeDirection == Direction.LONG) ? "SWING_LOW" : "SWING_HIGH";
+
+        // 3. Wyznaczamy okno czasowe wstecz (np. 5 świeczek * czas trwania świecy)
+        ZonedDateTime lookbackTime = interactionTime
+                .minus(triggerTimeframe.getDuration().multipliedBy(SWING_LOOKBACK_CANDLES));
+
+        // 4. Szukamy swingów w tym oknie
+        List<StoredSwingPoint> recentSwings = swingPointRepository.findRecentSwings(
+                symbol,
+                triggerTimeframe,
+                expectedSwingType,
+                lookbackTime
+        );
+
+        if (recentSwings.isEmpty()) {
+            log.debug("[{}] FVG Interaction (Touched/Filled) but NO recent swing found since {}.", strategyName, lookbackTime);
+            return List.of();
+        }
+
+        // 5. Mamy swing -> Alert
+        StoredSwingPoint lastSwing = recentSwings.get(recentSwings.size() - 1);
+
+        log.info("🚀 [{}] Late FVG Entry detected! Interaction at {}, Swing found at price {}",
+                strategyName, interactionTime, lastSwing.price());
+
+        return generateAlert(symbol, tradeDirection, fvg, lastSwing.price(), "Late FVG Entry (Pre-Swing)");
+    }
+
+//    private Direction resolveDirectionFromBias(BiasStatus bias) {
+//        if (bias == BiasStatus.BULLISH) return Direction.LONG;
+//        if (bias == BiasStatus.BEARISH) return Direction.SHORT;
+//        return null;
+//    }
 
     private List<AlertToSend> handleSwingTrigger(SwingPointDetectedEvent signal) {
         Symbol symbol = signal.symbol();
@@ -105,7 +155,7 @@ public class GrinderStrategyScenario implements Scenario {
         ZonedDateTime lookbackTime = event.touchedAt()
                 .minus(triggerTimeframe.getDuration().multipliedBy(SWING_LOOKBACK_CANDLES));
 
-        List<SwingPointDto> recentSwings = swingPointRepository.findRecentSwings(
+        List<StoredSwingPoint> recentSwings = swingPointRepository.findRecentSwings(
                 symbol,
                 triggerTimeframe,
                 expectedSwingType,
@@ -117,7 +167,7 @@ public class GrinderStrategyScenario implements Scenario {
             return List.of();
         }
 
-        SwingPointDto lastSwing = recentSwings.get(recentSwings.size() - 1);
+        StoredSwingPoint lastSwing = recentSwings.get(recentSwings.size() - 1);
 
         log.info("🚀 [{}] Late FVG Entry detected! Found Swing from {}", strategyName, lastSwing.price());
 

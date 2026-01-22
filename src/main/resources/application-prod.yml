@@ -14,7 +14,7 @@ app:
       enabled: true
       timeframes: [ H1, H4, D1 ]
     - name: FVG_KEYLEVEL_DIVERGENCE_STRATEGY
-      enabled: true
+      enabled: false
       timeframes: [ H1, H4 ]
     - name: "GRINDER_SWING_D1_H1"
       enabled: true

@@ -2,11 +2,10 @@ package pl.tradeengine.application.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import pl.tradeengine.application.dto.BiasAlertDto;
 import pl.tradeengine.application.dto.DivergenceAlertDto;
 import pl.tradeengine.application.dto.FvgAlertDto;
+import pl.tradeengine.application.dto.MomentumAlertDto;
 import pl.tradeengine.application.dto.PriceUpdateDto;
-import pl.tradeengine.application.dto.SwingPointDto;
 import pl.tradeengine.domain.event.DivergenceDetectedEvent;
 import pl.tradeengine.domain.event.DomainEvent;
 import pl.tradeengine.domain.event.FvgCreatedEvent;
@@ -34,6 +33,7 @@ import pl.tradeengine.domain.scenario.ScenarioEngine;
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -44,6 +44,8 @@ public class WebhookProcessingService {
     private final DivergenceRepository divergenceRepository;
     private final BiasRepository biasRepository;
     private final SwingPointRepository swingPointRepository;
+
+    private static final Set<Timeframe> BIAS_TIMEFRAMES = Set.of(Timeframe.D1, Timeframe.W1);
 
     private static final int X_OUTSIDE_CANDLES_TO_PAUSE = 4;
     private static final int Y_AFTER_FILLED_TO_EXPIRE   = 5;
@@ -82,21 +84,58 @@ public class WebhookProcessingService {
 
     }
 
-    public void handleBiasUpdate(BiasAlertDto dto) {
+    public void handleMomentumAlert(MomentumAlertDto dto) {
         Symbol symbol = new Symbol(dto.symbol());
         Timeframe timeframe = Timeframe.fromCode(dto.timeframe());
 
+        // Parsowanie kierunku (BULLISH/BEARISH)
+        String rawDirection = dto.direction().toUpperCase(); // "BULLISH" lub "BEARISH"
+
+        // LOGIKA ROZDZIELAJĄCA
+        if (BIAS_TIMEFRAMES.contains(timeframe)) {
+            // 1. Jeśli to wysoki interwał -> Aktualizujemy BIAS
+            updateBias(symbol, timeframe, rawDirection);
+        } else {
+            // 2. Jeśli to niższy interwał -> Rejestrujemy SWING POINT (Sygnał wejścia)
+            registerSwingPoint(symbol, timeframe, rawDirection);
+        }
+    }
+
+    private void updateBias(Symbol symbol, Timeframe timeframe, String rawDirection) {
         BiasStatus status;
         try {
-            status = BiasStatus.valueOf(dto.biasStatus().toUpperCase());
+            status = BiasStatus.valueOf(rawDirection); // BULLISH / BEARISH
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Unknown Bias Status: " + dto.biasStatus());
+            log.warn("Unknown Bias Status: {}", rawDirection);
+            return;
         }
-        String reason = "TV_WEBHOOK";
 
+        String reason = "MOMENTUM_WAVE_" + timeframe.name();
         log.info("📢 BIAS UPDATE: {} on {} changed to {}", symbol.code(), timeframe, status);
 
         biasRepository.updateBias(symbol, timeframe, status, reason);
+    }
+
+
+    private void registerSwingPoint(Symbol symbol, Timeframe timeframe, String rawDirection) {
+        // Mapowanie:
+        // BULLISH momentum (zielona kropka na dole) = SWING_LOW (dołek)
+        // BEARISH momentum (czerwona kropka na górze) = SWING_HIGH (szczyt)
+        String swingType = "BULLISH".equals(rawDirection) ? "SWING_LOW" : "SWING_HIGH";
+
+        // TODO: Pobierz aktualną cenę z serwisu cenowego/bazy danych.
+        // Alert PineScript nie wysyła ceny, więc na razie wstawiamy 0 lub null.
+        BigDecimal currentPrice = BigDecimal.ZERO;
+        ZonedDateTime now = ZonedDateTime.now();
+
+        log.info("🌊 SWING POINT: {} on {} -> {} (Price placeholder: {})", symbol.code(), timeframe, swingType, currentPrice);
+
+        swingPointRepository.save(symbol, timeframe, swingType, currentPrice, now);
+
+        SwingPointDetectedEvent event = new SwingPointDetectedEvent(
+                symbol, timeframe, swingType, currentPrice, now
+        );
+        process(event);
     }
 
 
@@ -274,17 +313,17 @@ public class WebhookProcessingService {
                 && candle.low().compareTo(fvg.getUpperPrice()) <= 0;
     }
 
-    public void handleSwingPoint(SwingPointDto dto) {
-        Symbol symbol = new Symbol(dto.symbol());
-        Timeframe tf = Timeframe.fromCode(dto.timeframe());
-        ZonedDateTime now = ZonedDateTime.now();
-
-        swingPointRepository.save(symbol, tf, dto.type(), dto.price(), now);
-
-        SwingPointDetectedEvent event = new SwingPointDetectedEvent(
-                symbol, tf, dto.type(), dto.price(), now
-        );
-        process(event);
-    }
+//    public void handleSwingPoint(SwingPointDto dto) {
+//        Symbol symbol = new Symbol(dto.symbol());
+//        Timeframe tf = Timeframe.fromCode(dto.timeframe());
+//        ZonedDateTime now = ZonedDateTime.now();
+//
+//        swingPointRepository.save(symbol, tf, dto.type(), dto.price(), now);
+//
+//        SwingPointDetectedEvent event = new SwingPointDetectedEvent(
+//                symbol, tf, dto.type(), dto.price(), now
+//        );
+//        process(event);
+//    }
 
 }
