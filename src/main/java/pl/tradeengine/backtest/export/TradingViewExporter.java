@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class TradingViewExporter {
 
-    private static final int MAX_ALERTS_TO_EXPORT = 100;  // ← Limit
+    private static final int MAX_ALERTS_TO_EXPORT = 400;  // ← Limit
 
     public void export(List<AlertToSend> alerts, Path outputPath) throws IOException {
         // Ogranicz do ostatnich N alertów
