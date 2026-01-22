@@ -88,15 +88,11 @@ public class WebhookProcessingService {
         Symbol symbol = new Symbol(dto.symbol());
         Timeframe timeframe = Timeframe.fromCode(dto.timeframe());
 
-        // Parsowanie kierunku (BULLISH/BEARISH)
-        String rawDirection = dto.direction().toUpperCase(); // "BULLISH" lub "BEARISH"
+        String rawDirection = dto.direction().toUpperCase();
 
-        // LOGIKA ROZDZIELAJĄCA
         if (BIAS_TIMEFRAMES.contains(timeframe)) {
-            // 1. Jeśli to wysoki interwał -> Aktualizujemy BIAS
             updateBias(symbol, timeframe, rawDirection);
         } else {
-            // 2. Jeśli to niższy interwał -> Rejestrujemy SWING POINT (Sygnał wejścia)
             registerSwingPoint(symbol, timeframe, rawDirection);
         }
     }
@@ -104,7 +100,7 @@ public class WebhookProcessingService {
     private void updateBias(Symbol symbol, Timeframe timeframe, String rawDirection) {
         BiasStatus status;
         try {
-            status = BiasStatus.valueOf(rawDirection); // BULLISH / BEARISH
+            status = BiasStatus.valueOf(rawDirection);
         } catch (IllegalArgumentException e) {
             log.warn("Unknown Bias Status: {}", rawDirection);
             return;
@@ -118,13 +114,8 @@ public class WebhookProcessingService {
 
 
     private void registerSwingPoint(Symbol symbol, Timeframe timeframe, String rawDirection) {
-        // Mapowanie:
-        // BULLISH momentum (zielona kropka na dole) = SWING_LOW (dołek)
-        // BEARISH momentum (czerwona kropka na górze) = SWING_HIGH (szczyt)
         String swingType = "BULLISH".equals(rawDirection) ? "SWING_LOW" : "SWING_HIGH";
 
-        // TODO: Pobierz aktualną cenę z serwisu cenowego/bazy danych.
-        // Alert PineScript nie wysyła ceny, więc na razie wstawiamy 0 lub null.
         BigDecimal currentPrice = BigDecimal.ZERO;
         ZonedDateTime now = ZonedDateTime.now();
 
@@ -243,7 +234,6 @@ public class WebhookProcessingService {
         }
 
         DomainEvent event = new PriceCandleEvent(tempCandle);
-//        log.info("Processing Price Update for symbol: {}", dto.symbol()); // Hide it?
         process(event);
     }
 
@@ -312,18 +302,5 @@ public class WebhookProcessingService {
         return candle.high().compareTo(fvg.getLowerPrice()) >= 0
                 && candle.low().compareTo(fvg.getUpperPrice()) <= 0;
     }
-
-//    public void handleSwingPoint(SwingPointDto dto) {
-//        Symbol symbol = new Symbol(dto.symbol());
-//        Timeframe tf = Timeframe.fromCode(dto.timeframe());
-//        ZonedDateTime now = ZonedDateTime.now();
-//
-//        swingPointRepository.save(symbol, tf, dto.type(), dto.price(), now);
-//
-//        SwingPointDetectedEvent event = new SwingPointDetectedEvent(
-//                symbol, tf, dto.type(), dto.price(), now
-//        );
-//        process(event);
-//    }
 
 }

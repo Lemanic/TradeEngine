@@ -35,8 +35,8 @@ public class SwingPointPersistenceAdapter implements SwingPointRepository {
     public List<StoredSwingPoint> findRecentSwings(Symbol symbol, Timeframe timeframe, String type, ZonedDateTime since) {
         return jpaRepo.findRecent(symbol.code(), timeframe, type, since)
                 .stream()
-                .map(e -> new StoredSwingPoint(    // <-- Tworzymy obiekt domenowy
-                        new Symbol(e.getSymbol()), // Zakładam że w StoredSwingPoint masz Symbol, a nie String
+                .map(e -> new StoredSwingPoint(
+                        new Symbol(e.getSymbol()),
                         e.getTimeframe(),
                         e.getType(),
                         e.getPrice(),
