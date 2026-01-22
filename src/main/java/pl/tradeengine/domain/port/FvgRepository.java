@@ -10,6 +10,7 @@ import pl.tradeengine.domain.model.Direction;
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface FvgRepository {
     FvgZone save(FvgZone fvgZone);
@@ -43,5 +44,7 @@ public interface FvgRepository {
             Symbol symbol,
             List<Timeframe> timeframes
     );
+
+    Optional<FvgZone> findById(Long id);
 
 }

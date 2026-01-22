@@ -12,6 +12,7 @@ import pl.tradeengine.domain.port.FvgRepository;
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public class FvgPersistenceAdapter implements FvgRepository {
@@ -158,4 +159,8 @@ public class FvgPersistenceAdapter implements FvgRepository {
                 .toList();
     }
 
+    @Override
+    public Optional<FvgZone> findById(Long id) {
+        return Optional.empty();
+    }
 }

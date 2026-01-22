@@ -108,7 +108,7 @@ public class GrinderStrategyScenario implements Scenario {
         log.info("🚀 [{}] Late FVG Entry detected! Interaction at {}, Swing found at price {}",
                 strategyName, interactionTime, lastSwing.price());
 
-        return generateAlert(symbol, tradeDirection, fvg, lastSwing.price(), "Late FVG Entry (Pre-Swing)");
+        return generateAlert(symbol, tradeDirection, fvg, lastSwing.price(), "Late FVG Entry (Pre-Swing)", interactionTime);
     }
 
     private List<AlertToSend> handleSwingTrigger(SwingPointDetectedEvent signal) {
@@ -133,7 +133,7 @@ public class GrinderStrategyScenario implements Scenario {
 
         if (activeContextFvgs.isEmpty()) return List.of();
 
-        return generateAlert(symbol, tradeDirection, activeContextFvgs.get(0), signal.price(), "Swing Trigger");
+        return generateAlert(symbol, tradeDirection, activeContextFvgs.get(0), signal.price(), "Swing Trigger", signal.detectedAt());
     }
 
     private List<AlertToSend> handleFvgTouchTrigger(FvgTouchedEvent event) {
@@ -168,7 +168,7 @@ public class GrinderStrategyScenario implements Scenario {
 
         log.info("🚀 [{}] Late FVG Entry detected! Found Swing from {}", strategyName, lastSwing.price());
 
-        return generateAlert(symbol, tradeDirection, fvg, lastSwing.price(), "Late FVG Entry (Pre-Swing)");
+        return generateAlert(symbol, tradeDirection, fvg, lastSwing.price(), "Late FVG Entry (Pre-Swing)", event.touchedAt());
     }
 
     private Direction resolveDirectionFromBias(BiasStatus bias) {
@@ -177,7 +177,7 @@ public class GrinderStrategyScenario implements Scenario {
         return null;
     }
 
-    private List<AlertToSend> generateAlert(Symbol symbol, Direction dir, FvgZone fvg, java.math.BigDecimal entryPrice, String method) {
+    private List<AlertToSend> generateAlert(Symbol symbol, Direction dir, FvgZone fvg, java.math.BigDecimal entryPrice, String method, ZonedDateTime timestamp) {
         String description = String.format(
                 "🚀 GRINDER SETUP (%s)\n" +
                         "Pair: %s\n" +
@@ -196,7 +196,7 @@ public class GrinderStrategyScenario implements Scenario {
         );
 
         return List.of(new AlertToSend(
-                symbol, dir, strategyName, triggerTimeframe, entryPrice, Optional.empty(), Optional.empty(), description
+                symbol, dir, strategyName, triggerTimeframe, entryPrice, Optional.empty(), Optional.empty(), description, timestamp
         ));
     }
 
