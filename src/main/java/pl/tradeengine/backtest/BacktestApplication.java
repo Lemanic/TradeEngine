@@ -4,12 +4,14 @@ import lombok.extern.slf4j.Slf4j;
 import pl.tradeengine.backtest.engine.BacktestRunner;
 import pl.tradeengine.backtest.engine.BacktestScenarioEngine;  // ← DODAJ
 import pl.tradeengine.backtest.export.TradingViewExporter;
+import pl.tradeengine.backtest.indicators.WaveTrendIndicator;
 import pl.tradeengine.backtest.loader.HistoricalCandleLoader;
 import pl.tradeengine.backtest.registry.BacktestScenarioRegistry;  // ← DODAJ
 import pl.tradeengine.backtest.repository.*;
 import pl.tradeengine.domain.model.*;
 import pl.tradeengine.domain.scenario.GrinderStrategyScenario;
 
+import java.math.BigDecimal;
 import java.nio.file.Paths;
 import java.util.*;
 
@@ -18,7 +20,7 @@ public class BacktestApplication {
 
     public static void main(String[] args) throws Exception {
         log.info("🚀 TradeEngine Backtest Starting...");
-
+        testWaveTrendCross();
         // 1. Load historical candles
         Symbol btc = new Symbol("BTCUSDT");
         HistoricalCandleLoader loader = new HistoricalCandleLoader();
@@ -58,5 +60,30 @@ public class BacktestApplication {
         exporter.export(alerts, Paths.get("output/backtest_results.pine"));
 
         log.info("✅ Backtest completed. Check output/backtest_results.pine");
+    }
+
+    private static void testWaveTrendCross() {
+        log.info("🧪 Testing WaveTrend indicator...");
+        WaveTrendIndicator wt = new WaveTrendIndicator(9, 12, 3);
+
+        int crossCount = 0;
+
+        // Symuluj 100 świec z sinusoidą
+        for (int i = 0; i < 100; i++) {
+            double price = 50000 + 5000 * Math.sin(i * 0.2);
+            WaveTrendIndicator.WaveTrendResult result = wt.next(BigDecimal.valueOf(price));
+
+            if (result.cross()) {
+                crossCount++;
+                log.info("  ✓ Cross #{} at candle {}: wt1={}, wt2={}, crossUp={}",
+                        crossCount, i, result.wt1(), result.wt2(), result.crossUp());
+            }
+        }
+
+        log.info("🧪 Test complete: {} crosses detected in 100 candles", crossCount);
+
+        if (crossCount == 0) {
+            log.error("❌ WaveTrend indicator NEVER crosses! Check implementation.");
+        }
     }
 }

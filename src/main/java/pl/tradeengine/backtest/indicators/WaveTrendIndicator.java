@@ -21,6 +21,8 @@ public class WaveTrendIndicator {
     private Double previousWt1 = null;
     private Double previousWt2 = null;
 
+    private int callCount = 0;
+
     public WaveTrendIndicator(int channelLen, int averageLen, int maLen) {
         this.channelLen = channelLen;
         this.averageLen = averageLen;
@@ -31,7 +33,6 @@ public class WaveTrendIndicator {
         this.wt1EMA = new EMA(averageLen);
         this.wt2SMA = new SMA(maLen);
     }
-
     public WaveTrendResult next(BigDecimal hlc3Price) {
         double src = hlc3Price.doubleValue();
 
@@ -42,13 +43,26 @@ public class WaveTrendIndicator {
         double de = deEMA.next(Math.abs(src - esa));
 
         // 3. CI = (src - esa) / (0.015 * de)
-        double ci = (src - esa) / (0.015 * de);
+        // Ochrona przed dzieleniem przez 0
+        double ci;
+        if (de == 0.0 || Double.isNaN(de)) {
+            ci = 0.0;  // ← Jeśli de=0, to ci=0 (brak zmiany)
+        } else {
+            ci = (src - esa) / (0.015 * de);
+        }
 
         // 4. WT1 = EMA(ci, averageLen)
         double wt1 = wt1EMA.next(ci);
 
         // 5. WT2 = SMA(wt1, maLen)
         double wt2 = wt2SMA.next(wt1);
+
+        // DEBUG: Log first 20 calls
+        callCount++;
+        if (callCount <= 20) {
+            log.info("WT call #{}: src={}, esa={}, de={}, ci={}, wt1={}, wt2={}",
+                    callCount, src, esa, de, ci, wt1, wt2);
+        }
 
         // 6. Detect Cross
         boolean cross = false;
@@ -62,6 +76,11 @@ public class WaveTrendIndicator {
             cross = wasBelowNowAbove || wasAboveNowBelow;
             crossUp = wasBelowNowAbove;
             crossDown = wasAboveNowBelow;
+
+            if (cross && callCount <= 100) {
+                log.info("  🎯 CROSS DETECTED at call #{}: wt1={}, wt2={}, crossUp={}",
+                        callCount, wt1, wt2, crossUp);
+            }
         }
 
         previousWt1 = wt1;
@@ -69,6 +88,7 @@ public class WaveTrendIndicator {
 
         return new WaveTrendResult(wt1, wt2, cross, crossUp, crossDown);
     }
+
 
     public record WaveTrendResult(
             double wt1,

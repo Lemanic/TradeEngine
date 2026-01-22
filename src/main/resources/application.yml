@@ -6,6 +6,7 @@ spring:
 logging:
   level:
     root: INFO
+    pl.tradeengine.backtest: DEBUG
 
   h2:
     console:

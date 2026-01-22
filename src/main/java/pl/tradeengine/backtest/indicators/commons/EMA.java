@@ -12,6 +12,11 @@ public class EMA {
     }
 
     public double next(double value) {
+        // Ochrona przed NaN/Infinity
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+            value = 0.0;  // ← Traktuj jako 0
+        }
+
         if (previousEMA == null) {
             previousEMA = value;
             return value;
@@ -21,6 +26,7 @@ public class EMA {
         previousEMA = ema;
         return ema;
     }
+
 
     public void reset() {
         previousEMA = null;

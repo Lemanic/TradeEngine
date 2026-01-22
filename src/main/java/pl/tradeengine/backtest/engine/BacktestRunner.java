@@ -31,6 +31,11 @@ public class BacktestRunner {
 
     private static final Set<Timeframe> BIAS_TIMEFRAMES = Set.of(Timeframe.D1, Timeframe.W1);
 
+    private int fvgCount = 0;
+    private int swingCount = 0;
+    private int biasChangeCount = 0;
+
+
     public BacktestRunner(
             Map<Timeframe, List<PriceCandle>> candlesByTf,
             BacktestScenarioEngine scenarioEngine,  // ← ZMIEŃ TYP (było: ScenarioEngine)
@@ -70,6 +75,8 @@ public class BacktestRunner {
         }
 
         long duration = System.currentTimeMillis() - startTime;
+        log.info("📊 STATS: {} FVGs detected, {} Swings, {} Bias changes",   // ← DODAJ
+                fvgCount, swingCount, biasChangeCount);
         log.info("✅ Backtest completed in {}ms. Processed {} candles, generated {} alerts",
                 duration, processedCandles, generatedAlerts.size());
 
@@ -83,6 +90,12 @@ public class BacktestRunner {
         WaveTrendIndicator wtIndicator = wtIndicators.get(tf);
         BigDecimal hlc3 = PriceCandleUtils.hlc3(candle);
         WaveTrendIndicator.WaveTrendResult wt = wtIndicator.next(hlc3);
+
+        // DEBUG: Log co 1000 świec dla D1
+        if (tf == Timeframe.D1 && candle.openTime().getDayOfMonth() == 1) {  // ← DODAJ
+            log.debug("WT D1 at {}: wt1={}, wt2={}, cross={}, crossUp={}",
+                    candle.openTime(), wt.wt1(), wt.wt2(), wt.cross(), wt.crossUp());
+        }
 
         // 2. Handle WaveTrend Cross
         if (wt.cross()) {
@@ -100,20 +113,24 @@ public class BacktestRunner {
         // 4. Update existing FVG states
         updateFvgStates(candle);
     }
-
     private void handleWaveTrendCross(Symbol symbol, Timeframe tf,
                                       WaveTrendIndicator.WaveTrendResult wt,
                                       PriceCandle candle) {
 
         if (BIAS_TIMEFRAMES.contains(tf)) {
+            biasChangeCount++;
             BiasStatus bias = wt.crossUp() ? BiasStatus.BULLISH : BiasStatus.BEARISH;
             biasRepo.updateBias(symbol, tf, bias, "MOMENTUM_WAVE_" + tf.name());
-            log.info("📢 BIAS UPDATE: {} on {} -> {}", symbol.code(), tf, bias);
+            log.info("📢 BIAS UPDATE: {} on {} -> {} at {}", symbol.code(), tf, bias, candle.closeTime());  // ← DODAJ timestamp
         } else {
+            swingCount++;
             String swingType = wt.crossUp() ? "SWING_LOW" : "SWING_HIGH";
             BigDecimal price = candle.close();
 
             swingRepo.save(symbol, tf, swingType, price, candle.closeTime());
+
+            log.info("🌊 SWING DETECTED: {} on {} -> {} at price {} ({})",   // ← DODAJ logowanie
+                    symbol.code(), tf, swingType, price, candle.closeTime());
 
             SwingPointDetectedEvent event = new SwingPointDetectedEvent(
                     symbol, tf, swingType, price, candle.closeTime()
@@ -123,11 +140,20 @@ public class BacktestRunner {
         }
     }
 
+
     private void handleFvgCreated(FvgZone fvg) {
+        fvgCount++;
         FvgZone saved = fvgRepo.save(fvg);
+
+//        log.info("📦 FVG CREATED: {} {} on {} [{} - {}] at {}",   // ← DODAJ
+//                saved.getSymbol().code(), saved.getDirection(), saved.getTimeframe(),
+//                saved.getLowerPrice(), saved.getUpperPrice(),
+//                "timestamp_placeholder");  // Możesz dodać timestamp do FvgZone jeśli chcesz
+
         FvgCreatedEvent event = new FvgCreatedEvent(saved);
         processEvent(event);
     }
+
 
     private void updateFvgStates(PriceCandle candle) {
         List<FvgZone> intersectedFvgs = fvgRepo.findIntersectingOpenFvgs(

@@ -10,12 +10,18 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.time.ZonedDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
 public class HistoricalCandleLoader {
+
+    // Formatter dla formatu: YYYY-MM-DD (tylko data, bez czasu)
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     public List<PriceCandle> loadFromCsv(Path csvPath, Symbol symbol, Timeframe timeframe) throws IOException {
         List<PriceCandle> candles = new ArrayList<>();
@@ -54,8 +60,19 @@ public class HistoricalCandleLoader {
             throw new IllegalArgumentException("Expected 5 columns, got " + parts.length);
         }
 
-        // Format: 2016-01-01T01:00:00+01:00
-        ZonedDateTime openTime = ZonedDateTime.parse(parts[0]);
+        // Parse date (format: 2020-11-30)
+        String dateStr = parts[0].trim();
+        ZonedDateTime openTime;
+
+        try {
+            // Próba parsowania jako ISO datetime (2016-01-01T01:00:00+01:00)
+            openTime = ZonedDateTime.parse(dateStr);
+        } catch (Exception e) {
+            // Jeśli się nie uda, parsuj jako samą datę (2020-11-30)
+            LocalDate date = LocalDate.parse(dateStr, DATE_FORMATTER);
+            openTime = date.atStartOfDay(ZoneOffset.UTC);
+        }
+
         ZonedDateTime closeTime = openTime.plus(timeframe.getDuration());
 
         BigDecimal open = new BigDecimal(parts[1]);

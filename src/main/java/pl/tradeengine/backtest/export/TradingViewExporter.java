@@ -4,59 +4,88 @@ import lombok.extern.slf4j.Slf4j;
 import pl.tradeengine.domain.model.AlertToSend;
 import pl.tradeengine.domain.model.Direction;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.ZonedDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
 public class TradingViewExporter {
 
+    private static final int MAX_ALERTS_TO_EXPORT = 100;  // ← Limit
+
     public void export(List<AlertToSend> alerts, Path outputPath) throws IOException {
-        Map<Direction, List<Long>> timestampsByDirection = alerts.stream()
-                .collect(Collectors.groupingBy(
-                        alert -> alert.getDirection() != null ? alert.getDirection() : Direction.LONG,
-                        Collectors.mapping(
-                                alert -> getTimestamp(alert).toInstant().toEpochMilli(),
-                                Collectors.toList()
-                        )
-                ));
+        // Ogranicz do ostatnich N alertów
+        List<AlertToSend> limitedAlerts = alerts.size() > MAX_ALERTS_TO_EXPORT
+                ? alerts.subList(alerts.size() - MAX_ALERTS_TO_EXPORT, alerts.size())
+                : alerts;
 
-        List<Long> longTimestamps = timestampsByDirection.getOrDefault(Direction.LONG, List.of());
-        List<Long> shortTimestamps = timestampsByDirection.getOrDefault(Direction.SHORT, List.of());
+        log.info("Exporting last {} out of {} total alerts to TradingView",
+                limitedAlerts.size(), alerts.size());
 
-        StringBuilder pine = new StringBuilder();
-        pine.append("//@version=5\n");
-        pine.append("indicator(\"Backtest Results - GRINDER\", overlay=true)\n\n");
+        try (BufferedWriter writer = Files.newBufferedWriter(outputPath)) {
+            // Header
+            writer.write("//@version=5\n");
+            writer.write("indicator('TradeEngine Backtest (Last " + limitedAlerts.size() + " Signals)', overlay=true)\n\n");
 
-        if (!longTimestamps.isEmpty()) {
-            pine.append("var longTimes = array.from(");
-            pine.append(longTimestamps.stream().map(String::valueOf).collect(Collectors.joining(", ")));
-            pine.append(")\n\n");
+            // Collect timestamps
+            List<Long> longTimestamps = limitedAlerts.stream()
+                    .filter(a -> a.getDirection() == Direction.LONG)
+                    .map(a -> a.getTimestamp().toInstant().toEpochMilli())
+                    .collect(Collectors.toList());
 
-            pine.append("if array.includes(longTimes, time)\n");
-            pine.append("    label.new(bar_index, low, \"🟢 BUY\", color=color.green, style=label.style_label_up, textcolor=color.white, size=size.small)\n\n");
+            List<Long> shortTimestamps = limitedAlerts.stream()
+                    .filter(a -> a.getDirection() == Direction.SHORT)
+                    .map(a -> a.getTimestamp().toInstant().toEpochMilli())
+                    .collect(Collectors.toList());
+
+            // Create arrays - split into chunks if needed
+            writer.write("// LONG timestamps\n");
+            writer.write("var longTimes = array.new_int()\n");
+            if (!longTimestamps.isEmpty()) {
+                writer.write("if barstate.isfirst\n");
+                for (Long ts : longTimestamps) {
+                    writer.write("    array.push(longTimes, " + ts + ")\n");
+                }
+            }
+
+            writer.write("\n// SHORT timestamps\n");
+            writer.write("var shortTimes = array.new_int()\n");
+            if (!shortTimestamps.isEmpty()) {
+                writer.write("if barstate.isfirst\n");
+                for (Long ts : shortTimestamps) {
+                    writer.write("    array.push(shortTimes, " + ts + ")\n");
+                }
+            }
+
+            // Check conditions
+            writer.write("\n// Check if current bar matches signal time\n");
+            writer.write("longCondition = array.includes(longTimes, time)\n");
+            writer.write("shortCondition = array.includes(shortTimes, time)\n");
+
+            // Plot shapes
+            writer.write("\n// Plot signals\n");
+            writer.write("plotshape(longCondition, title='LONG', style=shape.triangleup, " +
+                    "location=location.belowbar, color=color.new(color.green, 0), size=size.small)\n");
+            writer.write("plotshape(shortCondition, title='SHORT', style=shape.triangledown, " +
+                    "location=location.abovebar, color=color.new(color.red, 0), size=size.small)\n");
+
+            // Stats label
+            writer.write("\n// Display info\n");
+            writer.write(String.format("var label infoLabel = label.new(bar_index, high, " +
+                            "'Last %d signals\\n%d LONG / %d SHORT\\n(Total: %d)', " +
+                            "style=label.style_label_left, color=color.new(color.blue, 80), textcolor=color.white)\n",
+                    limitedAlerts.size(), longTimestamps.size(), shortTimestamps.size(), alerts.size()));
+            writer.write("if barstate.islast\n");
+            writer.write("    label.set_xy(infoLabel, bar_index + 10, high)\n");
         }
 
-        if (!shortTimestamps.isEmpty()) {
-            pine.append("var shortTimes = array.from(");
-            pine.append(shortTimestamps.stream().map(String::valueOf).collect(Collectors.joining(", ")));
-            pine.append(")\n\n");
+        long longCount = limitedAlerts.stream().filter(a -> a.getDirection() == Direction.LONG).count();
+        long shortCount = limitedAlerts.stream().filter(a -> a.getDirection() == Direction.SHORT).count();
 
-            pine.append("if array.includes(shortTimes, time)\n");
-            pine.append("    label.new(bar_index, high, \"🔴 SELL\", color=color.red, style=label.style_label_down, textcolor=color.white, size=size.small)\n");
-        }
-
-        Files.writeString(outputPath, pine.toString());
         log.info("✅ Exported {} alerts ({} LONG, {} SHORT) to: {}",
-                alerts.size(), longTimestamps.size(), shortTimestamps.size(), outputPath);
-    }
-
-    private ZonedDateTime getTimestamp(AlertToSend alert) {
-        // Zakładam że AlertToSend ma timestamp - jeśli nie, dostosuj
-        return ZonedDateTime.now(); // TODO: Pobierz faktyczny timestamp z alertu
+                limitedAlerts.size(), longCount, shortCount, outputPath);
     }
 }
