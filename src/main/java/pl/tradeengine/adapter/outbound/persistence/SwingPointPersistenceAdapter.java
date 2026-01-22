@@ -1,7 +1,7 @@
 package pl.tradeengine.adapter.outbound.persistence;
 
 import org.springframework.stereotype.Repository;
-import pl.tradeengine.application.dto.SwingPointDto;
+import pl.tradeengine.domain.model.StoredSwingPoint;
 import pl.tradeengine.domain.model.Symbol;
 import pl.tradeengine.domain.model.Timeframe;
 import pl.tradeengine.domain.port.SwingPointRepository;
@@ -32,15 +32,17 @@ public class SwingPointPersistenceAdapter implements SwingPointRepository {
     }
 
     @Override
-    public List<SwingPointDto> findRecentSwings(Symbol symbol, Timeframe timeframe, String type, ZonedDateTime since) {
+    public List<StoredSwingPoint> findRecentSwings(Symbol symbol, Timeframe timeframe, String type, ZonedDateTime since) {
         return jpaRepo.findRecent(symbol.code(), timeframe, type, since)
                 .stream()
-                .map(e -> new SwingPointDto(
-                        e.getSymbol(),
-                        e.getTimeframe().name(),
+                .map(e -> new StoredSwingPoint(
+                        new Symbol(e.getSymbol()),
+                        e.getTimeframe(),
                         e.getType(),
-                        e.getPrice()
+                        e.getPrice(),
+                        e.getDetectedAt()
                 ))
                 .toList();
     }
+
 }

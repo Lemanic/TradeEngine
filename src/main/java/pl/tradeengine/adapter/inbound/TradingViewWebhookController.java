@@ -6,11 +6,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import pl.tradeengine.application.dto.BiasAlertDto;
 import pl.tradeengine.application.dto.DivergenceAlertDto;
 import pl.tradeengine.application.dto.FvgAlertDto;
+import pl.tradeengine.application.dto.MomentumAlertDto;
 import pl.tradeengine.application.dto.PriceUpdateDto;
-import pl.tradeengine.application.dto.SwingPointDto;
 import pl.tradeengine.application.service.WebhookProcessingService;
 
 
@@ -43,21 +42,17 @@ public class TradingViewWebhookController {
         return ResponseEntity.accepted().build();
     }
 
-    @PostMapping("/bias")
-    public ResponseEntity<Void> bias(@RequestBody BiasAlertDto dto) {
+    @PostMapping("/momentum")
+    public ResponseEntity<Void> momentum(@RequestBody MomentumAlertDto dto) {
+        log.info("Received Momentum Alert: {}", dto);
         try {
-            webhookProcessingService.handleBiasUpdate(dto);
+            webhookProcessingService.handleMomentumAlert(dto);
             return ResponseEntity.accepted().build();
-        } catch (IllegalArgumentException e) {
-            log.error("Invalid BIAS data: {}", e.getMessage());
+        } catch (Exception e) {
+            log.error("Error processing momentum alert: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
 
-    @PostMapping("/swing")
-    public ResponseEntity<Void> swing(@RequestBody SwingPointDto dto) {
-        webhookProcessingService.handleSwingPoint(dto);
-        return ResponseEntity.accepted().build();
-    }
 
 }
