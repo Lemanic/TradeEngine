@@ -1,11 +1,12 @@
 spring:
   application:
-    version: "1.0.8"
+    version: "1.1.0"
   profiles:
     active: dev
 logging:
   level:
     root: INFO
+    pl.tradeengine.backtest: DEBUG
 
   h2:
     console:

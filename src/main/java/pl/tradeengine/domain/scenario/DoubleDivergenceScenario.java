@@ -68,7 +68,8 @@ public class DoubleDivergenceScenario implements Scenario {
                     new BigDecimal(21.37),
                     Optional.empty(),
                     Optional.empty(),
-                    description
+                    description,
+                    ZonedDateTime.now()
             );
             return List.of(alert);
         }
