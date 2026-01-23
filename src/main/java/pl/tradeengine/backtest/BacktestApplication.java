@@ -7,14 +7,24 @@ import pl.tradeengine.backtest.export.TradingViewExporter;
 import pl.tradeengine.backtest.indicators.WaveTrendIndicator;
 import pl.tradeengine.backtest.loader.HistoricalCandleLoader;
 import pl.tradeengine.backtest.registry.BacktestScenarioRegistry;
-import pl.tradeengine.backtest.repository.*;
-import pl.tradeengine.domain.model.*;
+
+import pl.tradeengine.backtest.repository.InMemoryBiasRepository;
+import pl.tradeengine.backtest.repository.InMemoryFvgRepository;
+import pl.tradeengine.backtest.repository.InMemorySwingPointRepository;
+import pl.tradeengine.domain.model.AlertToSend;
+import pl.tradeengine.domain.model.Direction;
+import pl.tradeengine.domain.model.PriceCandle;
+import pl.tradeengine.domain.model.Symbol;
+import pl.tradeengine.domain.model.Timeframe;
 import pl.tradeengine.domain.scenario.GrinderStrategyScenario;
 
 import java.math.BigDecimal;
 import java.nio.file.Paths;
 import java.time.ZonedDateTime;
-import java.util.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -23,10 +33,8 @@ public class BacktestApplication {
     public static void main(String[] args) throws Exception {
         log.info("🚀 TradeEngine Backtest Starting...");
 
-        // Test WaveTrend
         testWaveTrendCross();
 
-        // 1. Load historical candles
         Symbol btc = new Symbol("BTCUSDT");
         HistoricalCandleLoader loader = new HistoricalCandleLoader();
 
@@ -36,43 +44,39 @@ public class BacktestApplication {
         candlesByTf.put(Timeframe.D1, loader.loadFromCsv(Paths.get("data/btc_d1.csv"), btc, Timeframe.D1));
         candlesByTf.put(Timeframe.W1, loader.loadFromCsv(Paths.get("data/btc_w1.csv"), btc, Timeframe.W1));
 
-        // 2. Setup repositories
         InMemoryFvgRepository fvgRepo = new InMemoryFvgRepository();
         InMemoryBiasRepository biasRepo = new InMemoryBiasRepository();
         InMemorySwingPointRepository swingRepo = new InMemorySwingPointRepository();
 
         // 3. Setup strategies
 
-        // STRATEGIA 1: Swing Trading (D1 bias + H1 trigger)
+        // STRATEGY 1: Swing Trading (D1 bias + H1 trigger)
         GrinderStrategyScenario swingStrategy = new GrinderStrategyScenario(
                 fvgRepo, biasRepo, swingRepo,
                 "GRINDER_SWING_D1_H1",
-                Timeframe.D1,                          // Bias timeframe
-                List.of(Timeframe.D1),   // FVG timeframes
-                Timeframe.H1                           // Trigger timeframe
+                Timeframe.D1,           // Bias timeframe
+                List.of(Timeframe.D1),  // FVG timeframes
+                Timeframe.H1            // Trigger timeframe
         );
 
-        // STRATEGIA 2: Position Trading (W1 bias + H4 trigger)
+        // STRATEGY 2: Position Trading (W1 bias + H4 trigger)
         GrinderStrategyScenario positionStrategy = new GrinderStrategyScenario(
                 fvgRepo, biasRepo, swingRepo,
                 "GRINDER_POSITION_W1_H4",
-                Timeframe.W1,                          // Bias timeframe (weekly)
-                List.of(Timeframe.W1),   // FVG timeframes (większe gaps)
-                Timeframe.H4                           // Trigger timeframe (H4 swings)
+                Timeframe.W1,
+                List.of(Timeframe.D1, Timeframe.W1),
+                Timeframe.H4
         );
 
-        // 4. Setup ScenarioRegistry & Engine
         BacktestScenarioRegistry scenarioRegistry = new BacktestScenarioRegistry();
         scenarioRegistry.register(swingStrategy);
-        scenarioRegistry.register(positionStrategy);  // ← Druga strategia
+        scenarioRegistry.register(positionStrategy);
 
         BacktestScenarioEngine scenarioEngine = new BacktestScenarioEngine(scenarioRegistry);
 
-        // 5. Run backtest
         BacktestRunner runner = new BacktestRunner(candlesByTf, scenarioEngine, fvgRepo, biasRepo, swingRepo);
         List<AlertToSend> alerts = runner.run();
 
-        // 6. Rozdziel wyniki per strategia
         List<AlertToSend> swingAlerts = alerts.stream()
                 .filter(a -> a.getScenarioName().equals("GRINDER_SWING_D1_H1"))
                 .collect(Collectors.toList());
@@ -81,19 +85,14 @@ public class BacktestApplication {
                 .filter(a -> a.getScenarioName().equals("GRINDER_POSITION_W1_H4"))
                 .collect(Collectors.toList());
 
-        // 7. Export results
         TradingViewExporter exporter = new TradingViewExporter();
 
-// Ustaw zakres dat
-        ZonedDateTime startDate = ZonedDateTime.parse("2022-07-01T00:00:00Z");  // Połowa 2022
-        ZonedDateTime endDate = null;  // null = do końca
+        ZonedDateTime startDate = ZonedDateTime.parse("2022-07-01T00:00:00Z");
+        ZonedDateTime endDate = null;
 
-// Export z date filter
         exporter.export(alerts, Paths.get("output/backtest_all_strategies.pine"), startDate, endDate);
         exporter.export(swingAlerts, Paths.get("output/swing_strategy.pine"), startDate, endDate);
         exporter.export(positionAlerts, Paths.get("output/position_strategy.pine"), startDate, endDate);
-
-        // 8. Statystyki
 
         log.info("╔═══════════════════════════════════════════════╗");
         log.info("║         BACKTEST SUMMARY                      ║");
@@ -121,7 +120,6 @@ public class BacktestApplication {
 
         int crossCount = 0;
 
-        // Symuluj 100 świec z oscylacją
         for (int i = 0; i < 100; i++) {
             double price = 50000 + 5000 * Math.sin(i * 0.2);
             WaveTrendIndicator.WaveTrendResult result = wt.next(BigDecimal.valueOf(price));

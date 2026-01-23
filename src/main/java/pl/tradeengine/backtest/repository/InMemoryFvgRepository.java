@@ -1,12 +1,21 @@
 package pl.tradeengine.backtest.repository;
 
 import lombok.extern.slf4j.Slf4j;
-import pl.tradeengine.domain.model.*;
+
+import pl.tradeengine.domain.model.AlertMode;
+import pl.tradeengine.domain.model.Direction;
+import pl.tradeengine.domain.model.FvgStatus;
+import pl.tradeengine.domain.model.FvgZone;
+import pl.tradeengine.domain.model.Symbol;
+import pl.tradeengine.domain.model.Timeframe;
 import pl.tradeengine.domain.port.FvgRepository;
 
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
-import java.util.*;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
@@ -70,18 +79,13 @@ public class InMemoryFvgRepository implements FvgRepository {
                     fvg.getUpperPrice(),
                     fvg.getStrength(),
                     fvg.getKind(),
-                    FvgStatus.TOUCHED,         // ← Status
-                    fvg.getAlertMode(),        // ← Zachowaj alert mode
-                    touchedAt,                 // ← USTAW touchedAt!
-                    fvg.getLeftZoneAt(),       // ← Zachowaj inne pola
-                    fvg.getFilledAt(),         // ← Może już być filled
-                    fvg.getExpiresAt()         // ← Zachowaj expires
+                    FvgStatus.TOUCHED,
+                    fvg.getAlertMode(),
+                    touchedAt,
+                    fvg.getLeftZoneAt(),
+                    fvg.getFilledAt(),
+                    fvg.getExpiresAt()
             );
-//            FvgZone updated = new FvgZone(
-//                    fvg.getId(), fvg.getSymbol(), fvg.getTimeframe(), fvg.getDirection(),
-//                    fvg.getLowerPrice(), fvg.getUpperPrice(), fvg.getStrength(),
-//                    fvg.getKind(), FvgStatus.TOUCHED
-//            );
             fvgMap.put(id, updated);
         }
     }
@@ -114,18 +118,13 @@ public class InMemoryFvgRepository implements FvgRepository {
                     fvg.getUpperPrice(),
                     fvg.getStrength(),
                     fvg.getKind(),
-                    FvgStatus.FILLED,          // ← Status
-                    fvg.getAlertMode(),        // ← Zachowaj alert mode
-                    fvg.getTouchedAt(),        // ← Zachowaj touchedAt (może już być)
-                    fvg.getLeftZoneAt(),       // ← Zachowaj leftZoneAt
-                    filledAt,                  // ← USTAW filledAt!
-                    expiresAt                  // ← USTAW expiresAt
+                    FvgStatus.FILLED,
+                    fvg.getAlertMode(),
+                    fvg.getTouchedAt(),
+                    fvg.getLeftZoneAt(),
+                    filledAt,
+                    expiresAt
             );
-//            FvgZone updated = new FvgZone(
-//                    fvg.getId(), fvg.getSymbol(), fvg.getTimeframe(), fvg.getDirection(),
-//                    fvg.getLowerPrice(), fvg.getUpperPrice(), fvg.getStrength(),
-//                    fvg.getKind(), FvgStatus.FILLED
-//            );
             fvgMap.put(id, updated);
         }
     }
@@ -152,5 +151,4 @@ public class InMemoryFvgRepository implements FvgRepository {
                 .collect(Collectors.toList());
     }
 
-    // Dodaj pozostałe metody jeśli są wymagane przez interfejs...
 }

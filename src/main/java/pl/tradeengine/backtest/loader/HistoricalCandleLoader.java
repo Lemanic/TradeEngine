@@ -20,7 +20,6 @@ import java.util.List;
 @Slf4j
 public class HistoricalCandleLoader {
 
-    // Formatter dla formatu: YYYY-MM-DD (tylko data, bez czasu)
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     public List<PriceCandle> loadFromCsv(Path csvPath, Symbol symbol, Timeframe timeframe) throws IOException {
@@ -31,7 +30,6 @@ public class HistoricalCandleLoader {
         try (BufferedReader reader = Files.newBufferedReader(csvPath)) {
             String line;
 
-            // Skip header
             String header = reader.readLine();
             if (header == null || !header.startsWith("time,open,high,low,close")) {
                 throw new IOException("Invalid CSV header: " + header);
@@ -60,15 +58,12 @@ public class HistoricalCandleLoader {
             throw new IllegalArgumentException("Expected 5 columns, got " + parts.length);
         }
 
-        // Parse date (format: 2020-11-30)
         String dateStr = parts[0].trim();
         ZonedDateTime openTime;
 
         try {
-            // Próba parsowania jako ISO datetime (2016-01-01T01:00:00+01:00)
             openTime = ZonedDateTime.parse(dateStr);
         } catch (Exception e) {
-            // Jeśli się nie uda, parsuj jako samą datę (2020-11-30)
             LocalDate date = LocalDate.parse(dateStr, DATE_FORMATTER);
             openTime = date.atStartOfDay(ZoneOffset.UTC);
         }

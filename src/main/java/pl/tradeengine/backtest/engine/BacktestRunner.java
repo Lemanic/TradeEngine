@@ -4,15 +4,32 @@ import lombok.extern.slf4j.Slf4j;
 import pl.tradeengine.backtest.indicators.FvgDetector;
 import pl.tradeengine.backtest.indicators.WaveTrendIndicator;
 import pl.tradeengine.backtest.loader.CandleTimeline;
-import pl.tradeengine.backtest.repository.*;
-import pl.tradeengine.domain.event.*;
-import pl.tradeengine.domain.model.*;
-import pl.tradeengine.domain.scenario.ScenarioEngine;
+import pl.tradeengine.backtest.repository.InMemoryBiasRepository;
+import pl.tradeengine.backtest.repository.InMemoryFvgRepository;
+import pl.tradeengine.backtest.repository.InMemorySwingPointRepository;
+
+import pl.tradeengine.domain.event.DomainEvent;
+import pl.tradeengine.domain.event.FvgCreatedEvent;
+import pl.tradeengine.domain.event.FvgFilledEvent;
+import pl.tradeengine.domain.event.FvgTouchedEvent;
+import pl.tradeengine.domain.event.SwingPointDetectedEvent;
+import pl.tradeengine.domain.model.AlertToSend;
+import pl.tradeengine.domain.model.BiasStatus;
+import pl.tradeengine.domain.model.Direction;
+import pl.tradeengine.domain.model.FvgStatus;
+import pl.tradeengine.domain.model.FvgZone;
+import pl.tradeengine.domain.model.PriceCandle;
+import pl.tradeengine.domain.model.Symbol;
+import pl.tradeengine.domain.model.Timeframe;
 import pl.tradeengine.domain.util.PriceCandleUtils;
 
 import java.math.BigDecimal;
-import java.time.ZonedDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 @Slf4j
 public class BacktestRunner {
@@ -31,14 +48,9 @@ public class BacktestRunner {
 
     private static final Set<Timeframe> BIAS_TIMEFRAMES = Set.of(Timeframe.D1, Timeframe.W1);
 
-    private int fvgCount = 0;
-    private int swingCount = 0;
-    private int biasChangeCount = 0;
-
-
     public BacktestRunner(
             Map<Timeframe, List<PriceCandle>> candlesByTf,
-            BacktestScenarioEngine scenarioEngine,  // ← ZMIEŃ TYP (było: ScenarioEngine)
+            BacktestScenarioEngine scenarioEngine,
             InMemoryFvgRepository fvgRepo,
             InMemoryBiasRepository biasRepo,
             InMemorySwingPointRepository swingRepo
@@ -54,55 +66,27 @@ public class BacktestRunner {
             fvgDetectors.put(tf, new FvgDetector());
         }
 
-//        log.info("BacktestRunner initialized with {} timeframes", candlesByTf.size());
     }
 
     public List<AlertToSend> run() {
-//        log.info("🚀 Starting backtest...");
-
-        long startTime = System.currentTimeMillis();
-        int processedCandles = 0;
-
         while (timeline.hasNext()) {
             CandleTimeline.CandleClosedEvent event = timeline.getNextEvent();
             processCandle(event.timeframe(), event.candle());
-            processedCandles++;
-
-            if (processedCandles % 1000 == 0) {
-//                log.info("Processed {} candles, generated {} alerts so far",
-//                        processedCandles, generatedAlerts.size());
-            }
         }
-
-        long duration = System.currentTimeMillis() - startTime;
-//        log.info("📊 STATS: {} FVGs detected, {} Swings, {} Bias changes",   // ← DODAJ
-//                fvgCount, swingCount, biasChangeCount);
-//        log.info("✅ Backtest completed in {}ms. Processed {} candles, generated {} alerts",
-//                duration, processedCandles, generatedAlerts.size());
-
         return generatedAlerts;
     }
 
     private void processCandle(Timeframe tf, PriceCandle candle) {
         Symbol symbol = candle.symbol();
 
-        // 1. Calculate WaveTrend
         WaveTrendIndicator wtIndicator = wtIndicators.get(tf);
         BigDecimal hlc3 = PriceCandleUtils.hlc3(candle);
         WaveTrendIndicator.WaveTrendResult wt = wtIndicator.next(hlc3);
 
-        // DEBUG: Log co 1000 świec dla D1
-        if (tf == Timeframe.D1 && candle.openTime().getDayOfMonth() == 1) {  // ← DODAJ
-//            log.debug("WT D1 at {}: wt1={}, wt2={}, cross={}, crossUp={}",
-//                    candle.openTime(), wt.wt1(), wt.wt2(), wt.cross(), wt.crossUp());
-        }
-
-        // 2. Handle WaveTrend Cross
         if (wt.cross()) {
             handleWaveTrendCross(symbol, tf, wt, candle);
         }
 
-        // 3. Detect FVG
         FvgDetector fvgDetector = fvgDetectors.get(tf);
         Optional<FvgZone> fvg = fvgDetector.detect(candle);
 
@@ -110,27 +94,22 @@ public class BacktestRunner {
             handleFvgCreated(fvg.get());
         }
 
-        // 4. Update existing FVG states
         updateFvgStates(candle);
     }
+
     private void handleWaveTrendCross(Symbol symbol, Timeframe tf,
                                       WaveTrendIndicator.WaveTrendResult wt,
                                       PriceCandle candle) {
 
         if (BIAS_TIMEFRAMES.contains(tf)) {
-            biasChangeCount++;
             BiasStatus bias = wt.crossUp() ? BiasStatus.BULLISH : BiasStatus.BEARISH;
             biasRepo.updateBias(symbol, tf, bias, "MOMENTUM_WAVE_" + tf.name());
-//            log.info("📢 BIAS UPDATE: {} on {} -> {} at {}", symbol.code(), tf, bias, candle.closeTime());  // ← DODAJ timestamp
+
         } else {
-            swingCount++;
             String swingType = wt.crossUp() ? "SWING_LOW" : "SWING_HIGH";
             BigDecimal price = candle.close();
 
             swingRepo.save(symbol, tf, swingType, price, candle.closeTime());
-
-//            log.info("🌊 SWING DETECTED: {} on {} -> {} at price {} ({})",   // ← DODAJ logowanie
-//                    symbol.code(), tf, swingType, price, candle.closeTime());
 
             SwingPointDetectedEvent event = new SwingPointDetectedEvent(
                     symbol, tf, swingType, price, candle.closeTime()
@@ -142,14 +121,7 @@ public class BacktestRunner {
 
 
     private void handleFvgCreated(FvgZone fvg) {
-        fvgCount++;
         FvgZone saved = fvgRepo.save(fvg);
-
-//        log.info("📦 FVG CREATED: {} {} on {} [{} - {}] at {}",   // ← DODAJ
-//                saved.getSymbol().code(), saved.getDirection(), saved.getTimeframe(),
-//                saved.getLowerPrice(), saved.getUpperPrice(),
-//                "timestamp_placeholder");  // Możesz dodać timestamp do FvgZone jeśli chcesz
-
         FvgCreatedEvent event = new FvgCreatedEvent(saved);
         processEvent(event);
     }
@@ -164,55 +136,33 @@ public class BacktestRunner {
                 continue;
             }
 
-            // ===== FILLED CHECK =====
             boolean isFilled = false;
 
             if (fvg.getDirection() == Direction.LONG) {
-                // LONG FVG filled: cena CAŁKOWICIE przeszła przez FVG (spadła poniżej dolnej krawędzi)
                 isFilled = candle.low().compareTo(fvg.getLowerPrice()) < 0;
 
             } else if (fvg.getDirection() == Direction.SHORT) {
-                // SHORT FVG filled: cena CAŁKOWICIE przeszła przez FVG (wzrosła powyżej górnej krawędzi)
                 isFilled = candle.high().compareTo(fvg.getUpperPrice()) > 0;
             }
 
             if (isFilled) {
-//                log.info("🎯 FVG FILLED: #{} {} at {} | FVG: [{}-{}] | Price broke through: {}",
-//                        fvg.getId(), fvg.getDirection(), candle.closeTime(),
-//                        fvg.getLowerPrice(), fvg.getUpperPrice(),
-//                        fvg.getDirection() == Direction.LONG ? candle.low() : candle.high());
-
                 fvgRepo.markFilled(fvg.getId(), candle.closeTime(), null);
                 FvgZone filledFvg = fvgRepo.findById(fvg.getId()).orElseThrow();
                 FvgFilledEvent event = new FvgFilledEvent(filledFvg, candle.closeTime());
                 processEvent(event);
 
             } else if (fvg.getStatus() == FvgStatus.CREATED) {
-                // ===== TOUCHED CHECK =====
                 boolean isTouched = false;
 
                 if (fvg.getDirection() == Direction.LONG) {
-                    // LONG FVG touched: candle LOW jest WEWNĄTRZ FVG (cena spadła do FVG)
-                    // Strict: bez krawędzi
                     isTouched = candle.low().compareTo(fvg.getLowerPrice()) > 0
                             && candle.low().compareTo(fvg.getUpperPrice()) < 0;
-
-                    // LUB z krawędzią (jeśli chcesz):
-                    // isTouched = candle.low().compareTo(fvg.getLowerPrice()) >= 0
-                    //         && candle.low().compareTo(fvg.getUpperPrice()) <= 0;
-
                 } else {
-                    // SHORT FVG touched: candle HIGH jest WEWNĄTRZ FVG (cena wzrosła do FVG)
                     isTouched = candle.high().compareTo(fvg.getLowerPrice()) > 0
                             && candle.high().compareTo(fvg.getUpperPrice()) < 0;
                 }
 
                 if (isTouched) {
-//                    log.info("👉 FVG TOUCHED: #{} {} at {} | FVG: [{}-{}] | Candle: [L:{} H:{}]",
-//                            fvg.getId(), fvg.getDirection(), candle.closeTime(),
-//                            fvg.getLowerPrice(), fvg.getUpperPrice(),
-//                            candle.low(), candle.high());
-
                     fvgRepo.markTouched(fvg.getId(), candle.closeTime());
                     FvgZone touchedFvg = fvgRepo.findById(fvg.getId()).orElseThrow();
                     FvgTouchedEvent event = new FvgTouchedEvent(touchedFvg, candle.closeTime());

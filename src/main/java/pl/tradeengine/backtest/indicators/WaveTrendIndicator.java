@@ -36,35 +36,27 @@ public class WaveTrendIndicator {
     public WaveTrendResult next(BigDecimal hlc3Price) {
         double src = hlc3Price.doubleValue();
 
-        // 1. ESA = EMA(src, channelLen)
         double esa = esaEMA.next(src);
 
-        // 2. DE = EMA(|src - esa|, channelLen)
         double de = deEMA.next(Math.abs(src - esa));
 
-        // 3. CI = (src - esa) / (0.015 * de)
-        // Ochrona przed dzieleniem przez 0
         double ci;
         if (de == 0.0 || Double.isNaN(de)) {
-            ci = 0.0;  // ← Jeśli de=0, to ci=0 (brak zmiany)
+            ci = 0.0;
         } else {
             ci = (src - esa) / (0.015 * de);
         }
 
-        // 4. WT1 = EMA(ci, averageLen)
         double wt1 = wt1EMA.next(ci);
 
-        // 5. WT2 = SMA(wt1, maLen)
         double wt2 = wt2SMA.next(wt1);
 
-        // DEBUG: Log first 20 calls
         callCount++;
         if (callCount <= 20) {
             log.info("WT call #{}: src={}, esa={}, de={}, ci={}, wt1={}, wt2={}",
                     callCount, src, esa, de, ci, wt1, wt2);
         }
 
-        // 6. Detect Cross
         boolean cross = false;
         boolean crossUp = false;
         boolean crossDown = false;

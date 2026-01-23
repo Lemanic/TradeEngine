@@ -17,7 +17,6 @@ public class BacktestScenarioEngine {
     }
 
     public List<AlertToSend> onEvent(DomainEvent event) {
-        // Prosta implementacja: wszystkie scenariusze dostają każdy event
         return scenarioRegistry.getAllEnabledScenarios().stream()
                 .flatMap(scenario -> scenario.onEvent(event).stream())
                 .toList();

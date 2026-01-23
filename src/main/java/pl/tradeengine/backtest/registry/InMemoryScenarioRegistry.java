@@ -3,7 +3,9 @@ package pl.tradeengine.backtest.registry;
 import pl.tradeengine.domain.model.Timeframe;
 import pl.tradeengine.domain.scenario.Scenario;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+
 
 public class InMemoryScenarioRegistry {
 
