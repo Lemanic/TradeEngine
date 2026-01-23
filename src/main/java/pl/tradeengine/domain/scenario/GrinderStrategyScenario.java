@@ -126,6 +126,7 @@ public class GrinderStrategyScenario implements Scenario {
         Symbol symbol = signal.symbol();
         Timeframe tf = signal.timeframe();
 
+
 //        log.info("🔍 [{}] handleSwingTrigger: {} on {} type={} at {}",  // ← Dodaj nazwę strategii
 //                strategyName, symbol.code(), tf, signal.type(), signal.detectedAt());
 
@@ -177,7 +178,9 @@ public class GrinderStrategyScenario implements Scenario {
                             : fvg.getFilledAt();
 
                     if (fvgEventTime == null) {
-//                        log.warn("    [{}] ⚠️ FVG #{} has no touched/filled timestamp!", strategyName, fvg.getId());
+                        if (fvg.getId() != null && fvg.getId() == 3973L) {
+                            log.warn("  [{}] ⚠️ FVG #3973 has NO touched/filled timestamp!", strategyName);
+                        }
                         return false;
                     }
 
@@ -267,7 +270,6 @@ public class GrinderStrategyScenario implements Scenario {
         if (bias == BiasStatus.BEARISH) return Direction.SHORT;
         return null;
     }
-
     private List<AlertToSend> generateAlert(Symbol symbol, Direction dir, FvgZone fvg, java.math.BigDecimal entryPrice, String method, ZonedDateTime timestamp) {
         ZonedDateTime fvgEventTime = fvg.getTouchedAt() != null ? fvg.getTouchedAt() : fvg.getFilledAt();
         long timeDiffMinutes = fvgEventTime != null
@@ -275,52 +277,34 @@ public class GrinderStrategyScenario implements Scenario {
                 : -1;
 
         log.info("╔══════════════════════════════════════════════════════════════╗");
-        log.info("║  🚨 ALERT GENERATED - [{}]", strategyName);
+        log.info("║  🚨 ALERT GENERATED - [{}] | {} {} @ {}",
+                strategyName, dir, symbol.code(), PriceFormatter.format(entryPrice));
+        log.info("║  Method: {} | Alert Time: {}", method, timestamp);
         log.info("╟──────────────────────────────────────────────────────────────╢");
-        log.info("║  Direction:      {} {}", dir, symbol.code());
-        log.info("║  Entry Price:    {}", PriceFormatter.format(entryPrice));
-        log.info("║  Alert Time:     {} ← SWING DETECTED", timestamp);  // ← Zmieniono
-        log.info("║  Method:         {}", method);
-        log.info("╟──────────────────────────────────────────────────────────────╢");
-        log.info("║  FVG Details:");
-        log.info("║    ID:           #{}", fvg.getId());
-        log.info("║    Timeframe:    {}", fvg.getTimeframe());
-        log.info("║    Status:       {}", fvg.getStatus());
-        log.info("║    Direction:    {}", fvg.getDirection());
-        log.info("║    Price Range:  {} - {}",
+        log.info("║  FVG #{} | {} | {} | {} | Range: {} - {}",
+                fvg.getId(),
+                fvg.getTimeframe(),
+                fvg.getStatus(),
+                fvg.getDirection(),
                 PriceFormatter.format(fvg.getLowerPrice()),
                 PriceFormatter.format(fvg.getUpperPrice()));
 
-        // ✅ Pokazuj touched i filled osobno
+        // Timeline w jednej lub dwóch liniach
+        StringBuilder timeline = new StringBuilder("║  Timeline: ");
         if (fvg.getTouchedAt() != null) {
-            long touchedMinutesAgo = java.time.Duration.between(fvg.getTouchedAt(), timestamp).toMinutes();
-            log.info("║    Touched At:   {} ({}min ago)", fvg.getTouchedAt(), touchedMinutesAgo);
-        } else {
-            log.info("║    Touched At:   N/A");
-        }
-
-        if (fvg.getFilledAt() != null) {
-            long filledMinutesAgo = java.time.Duration.between(fvg.getFilledAt(), timestamp).toMinutes();
-            log.info("║    Filled At:    {} ({}min ago)", fvg.getFilledAt(), filledMinutesAgo);
-        } else {
-            log.info("║    Filled At:    N/A");
-        }
-
-        // ✅ Timeline
-        log.info("║");
-        log.info("║  Timeline:");
-        if (fvg.getTouchedAt() != null) {
-            log.info("║    1️⃣  FVG Touched:  {}", fvg.getTouchedAt());
+            long touchedAgo = java.time.Duration.between(fvg.getTouchedAt(), timestamp).toMinutes();
+            timeline.append(String.format("Touched %dmin ago", touchedAgo));
         }
         if (fvg.getFilledAt() != null) {
-            log.info("║    2️⃣  FVG Filled:   {}", fvg.getFilledAt());
+            long filledAgo = java.time.Duration.between(fvg.getFilledAt(), timestamp).toMinutes();
+            if (fvg.getTouchedAt() != null) timeline.append(" → ");
+            timeline.append(String.format("Filled %dmin ago", filledAgo));
         }
-        log.info("║    3️⃣  Swing/Alert:  {} ← NOW", timestamp);
-
+        timeline.append(" → Alert NOW");
         if (fvgEventTime != null) {
-            log.info("║");
-            log.info("║    ⏱️  FVG → Alert delay: {} minutes", timeDiffMinutes);
+            timeline.append(String.format(" (⏱️ %dmin delay)", timeDiffMinutes));
         }
+        log.info(timeline.toString());
 
         log.info("╚══════════════════════════════════════════════════════════════╝");
 
@@ -345,5 +329,83 @@ public class GrinderStrategyScenario implements Scenario {
                 symbol, dir, strategyName, triggerTimeframe, entryPrice, Optional.empty(), Optional.empty(), description, timestamp
         ));
     }
+
+//    private List<AlertToSend> generateAlert(Symbol symbol, Direction dir, FvgZone fvg, java.math.BigDecimal entryPrice, String method, ZonedDateTime timestamp) {
+//        ZonedDateTime fvgEventTime = fvg.getTouchedAt() != null ? fvg.getTouchedAt() : fvg.getFilledAt();
+//        long timeDiffMinutes = fvgEventTime != null
+//                ? java.time.Duration.between(fvgEventTime, timestamp).toMinutes()
+//                : -1;
+//
+//        log.info("╔══════════════════════════════════════════════════════════════╗");
+//        log.info("║  🚨 ALERT GENERATED - [{}]", strategyName);
+//        log.info("╟──────────────────────────────────────────────────────────────╢");
+//        log.info("║  Direction:      {} {}", dir, symbol.code());
+//        log.info("║  Entry Price:    {}", PriceFormatter.format(entryPrice));
+//        log.info("║  Alert Time:     {} ← SWING DETECTED", timestamp);  // ← Zmieniono
+//        log.info("║  Method:         {}", method);
+//        log.info("╟──────────────────────────────────────────────────────────────╢");
+//        log.info("║  FVG Details:");
+//        log.info("║    ID:           #{}", fvg.getId());
+//        log.info("║    Timeframe:    {}", fvg.getTimeframe());
+//        log.info("║    Status:       {}", fvg.getStatus());
+//        log.info("║    Direction:    {}", fvg.getDirection());
+//        log.info("║    Price Range:  {} - {}",
+//                PriceFormatter.format(fvg.getLowerPrice()),
+//                PriceFormatter.format(fvg.getUpperPrice()));
+//
+//        // ✅ Pokazuj touched i filled osobno
+//        if (fvg.getTouchedAt() != null) {
+//            long touchedMinutesAgo = java.time.Duration.between(fvg.getTouchedAt(), timestamp).toMinutes();
+//            log.info("║    Touched At:   {} ({}min ago)", fvg.getTouchedAt(), touchedMinutesAgo);
+//        } else {
+//            log.info("║    Touched At:   N/A");
+//        }
+//
+//        if (fvg.getFilledAt() != null) {
+//            long filledMinutesAgo = java.time.Duration.between(fvg.getFilledAt(), timestamp).toMinutes();
+//            log.info("║    Filled At:    {} ({}min ago)", fvg.getFilledAt(), filledMinutesAgo);
+//        } else {
+//            log.info("║    Filled At:    N/A");
+//        }
+//
+//        // ✅ Timeline
+//        log.info("║");
+//        log.info("║  Timeline:");
+//        if (fvg.getTouchedAt() != null) {
+//            log.info("║    1️⃣  FVG Touched:  {}", fvg.getTouchedAt());
+//        }
+//        if (fvg.getFilledAt() != null) {
+//            log.info("║    2️⃣  FVG Filled:   {}", fvg.getFilledAt());
+//        }
+//        log.info("║    3️⃣  Swing/Alert:  {} ← NOW", timestamp);
+//
+//        if (fvgEventTime != null) {
+//            log.info("║");
+//            log.info("║    ⏱️  FVG → Alert delay: {} minutes", timeDiffMinutes);
+//        }
+//
+//        log.info("╚══════════════════════════════════════════════════════════════╝");
+//
+//        String description = String.format(
+//                "🚀 GRINDER SETUP (%s)\n" +
+//                        "Pair: %s\n" +
+//                        "Strategy: %s\n" +
+//                        "Bias: %s\n" +
+//                        "Zone: %s FVG [%s - %s]\n" +
+//                        "Entry: %s",
+//                method,
+//                symbol.code(),
+//                strategyName,
+//                biasTimeframe,
+//                fvg.getTimeframe(),
+//                PriceFormatter.format(fvg.getLowerPrice()),
+//                PriceFormatter.format(fvg.getUpperPrice()),
+//                PriceFormatter.format(entryPrice)
+//        );
+//
+//        return List.of(new AlertToSend(
+//                symbol, dir, strategyName, triggerTimeframe, entryPrice, Optional.empty(), Optional.empty(), description, timestamp
+//        ));
+//    }
 
 }

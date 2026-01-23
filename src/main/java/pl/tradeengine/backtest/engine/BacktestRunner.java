@@ -154,7 +154,6 @@ public class BacktestRunner {
         processEvent(event);
     }
 
-
     private void updateFvgStates(PriceCandle candle) {
         List<FvgZone> intersectedFvgs = fvgRepo.findIntersectingOpenFvgs(
                 candle.symbol(), candle.low(), candle.high()
@@ -165,29 +164,60 @@ public class BacktestRunner {
                 continue;
             }
 
+            // ===== FILLED CHECK =====
             boolean isFilled = false;
 
-            if (fvg.getDirection() == Direction.LONG && candle.low().compareTo(fvg.getLowerPrice()) <= 0) {
-                isFilled = true;
-            } else if (fvg.getDirection() == Direction.SHORT && candle.high().compareTo(fvg.getUpperPrice()) >= 0) {
-                isFilled = true;
+            if (fvg.getDirection() == Direction.LONG) {
+                // LONG FVG filled: cena CAŁKOWICIE przeszła przez FVG (spadła poniżej dolnej krawędzi)
+                isFilled = candle.low().compareTo(fvg.getLowerPrice()) < 0;
+
+            } else if (fvg.getDirection() == Direction.SHORT) {
+                // SHORT FVG filled: cena CAŁKOWICIE przeszła przez FVG (wzrosła powyżej górnej krawędzi)
+                isFilled = candle.high().compareTo(fvg.getUpperPrice()) > 0;
             }
 
             if (isFilled) {
-                log.debug("🎯 Marking FVG #{} as FILLED at {}", fvg.getId(), candle.closeTime());  // ← DODAJ
-                fvgRepo.markFilled(fvg.getId(), candle.closeTime(), null);
+//                log.info("🎯 FVG FILLED: #{} {} at {} | FVG: [{}-{}] | Price broke through: {}",
+//                        fvg.getId(), fvg.getDirection(), candle.closeTime(),
+//                        fvg.getLowerPrice(), fvg.getUpperPrice(),
+//                        fvg.getDirection() == Direction.LONG ? candle.low() : candle.high());
 
+                fvgRepo.markFilled(fvg.getId(), candle.closeTime(), null);
                 FvgZone filledFvg = fvgRepo.findById(fvg.getId()).orElseThrow();
                 FvgFilledEvent event = new FvgFilledEvent(filledFvg, candle.closeTime());
                 processEvent(event);
 
             } else if (fvg.getStatus() == FvgStatus.CREATED) {
-                log.debug("👉 Marking FVG #{} as TOUCHED at {}", fvg.getId(), candle.closeTime());  // ← DODAJ
-                fvgRepo.markTouched(fvg.getId(), candle.closeTime());
+                // ===== TOUCHED CHECK =====
+                boolean isTouched = false;
 
-                FvgZone touchedFvg = fvgRepo.findById(fvg.getId()).orElseThrow();
-                FvgTouchedEvent event = new FvgTouchedEvent(touchedFvg, candle.closeTime());
-                processEvent(event);
+                if (fvg.getDirection() == Direction.LONG) {
+                    // LONG FVG touched: candle LOW jest WEWNĄTRZ FVG (cena spadła do FVG)
+                    // Strict: bez krawędzi
+                    isTouched = candle.low().compareTo(fvg.getLowerPrice()) > 0
+                            && candle.low().compareTo(fvg.getUpperPrice()) < 0;
+
+                    // LUB z krawędzią (jeśli chcesz):
+                    // isTouched = candle.low().compareTo(fvg.getLowerPrice()) >= 0
+                    //         && candle.low().compareTo(fvg.getUpperPrice()) <= 0;
+
+                } else {
+                    // SHORT FVG touched: candle HIGH jest WEWNĄTRZ FVG (cena wzrosła do FVG)
+                    isTouched = candle.high().compareTo(fvg.getLowerPrice()) > 0
+                            && candle.high().compareTo(fvg.getUpperPrice()) < 0;
+                }
+
+                if (isTouched) {
+//                    log.info("👉 FVG TOUCHED: #{} {} at {} | FVG: [{}-{}] | Candle: [L:{} H:{}]",
+//                            fvg.getId(), fvg.getDirection(), candle.closeTime(),
+//                            fvg.getLowerPrice(), fvg.getUpperPrice(),
+//                            candle.low(), candle.high());
+
+                    fvgRepo.markTouched(fvg.getId(), candle.closeTime());
+                    FvgZone touchedFvg = fvgRepo.findById(fvg.getId()).orElseThrow();
+                    FvgTouchedEvent event = new FvgTouchedEvent(touchedFvg, candle.closeTime());
+                    processEvent(event);
+                }
             }
         }
     }

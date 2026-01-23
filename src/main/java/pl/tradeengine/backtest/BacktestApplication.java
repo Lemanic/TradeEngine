@@ -48,7 +48,7 @@ public class BacktestApplication {
                 fvgRepo, biasRepo, swingRepo,
                 "GRINDER_SWING_D1_H1",
                 Timeframe.D1,                          // Bias timeframe
-                List.of(Timeframe.H4, Timeframe.D1),   // FVG timeframes
+                List.of(Timeframe.D1),   // FVG timeframes
                 Timeframe.H1                           // Trigger timeframe
         );
 
@@ -57,7 +57,7 @@ public class BacktestApplication {
                 fvgRepo, biasRepo, swingRepo,
                 "GRINDER_POSITION_W1_H4",
                 Timeframe.W1,                          // Bias timeframe (weekly)
-                List.of(Timeframe.D1, Timeframe.W1),   // FVG timeframes (większe gaps)
+                List.of(Timeframe.W1),   // FVG timeframes (większe gaps)
                 Timeframe.H4                           // Trigger timeframe (H4 swings)
         );
 
