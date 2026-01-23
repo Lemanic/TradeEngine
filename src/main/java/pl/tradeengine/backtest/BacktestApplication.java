@@ -91,28 +91,25 @@ public class BacktestApplication {
         exporter.export(positionAlerts, Paths.get("output/position_strategy.pine"));
 
         // 8. Statystyki
+// 8. Statystyki
         log.info("╔═══════════════════════════════════════════════╗");
         log.info("║         BACKTEST SUMMARY                      ║");
         log.info("╠═══════════════════════════════════════════════╣");
-        log.info("║ Total Alerts:           {:>20} ║", alerts.size());
+        log.info("║ Total Alerts:                          {} ║", String.format("%6d", alerts.size()));
         log.info("║                                               ║");
-        log.info("║ SWING Strategy (D1/H1): {:>20} ║", swingAlerts.size());
-        log.info("║   - LONG:               {:>20} ║",
-                swingAlerts.stream().filter(a -> a.getDirection() == Direction.LONG).count());
-        log.info("║   - SHORT:              {:>20} ║",
-                swingAlerts.stream().filter(a -> a.getDirection() == Direction.SHORT).count());
+        log.info("║ SWING Strategy (D1/H1):                {} ║", String.format("%6d", swingAlerts.size()));
+        log.info("║   - LONG:                              {} ║",
+                String.format("%6d", swingAlerts.stream().filter(a -> a.getDirection() == Direction.LONG).count()));
+        log.info("║   - SHORT:                             {} ║",
+                String.format("%6d", swingAlerts.stream().filter(a -> a.getDirection() == Direction.SHORT).count()));
         log.info("║                                               ║");
-        log.info("║ POSITION Strategy (W1/H4): {:>17} ║", positionAlerts.size());
-        log.info("║   - LONG:               {:>20} ║",
-                positionAlerts.stream().filter(a -> a.getDirection() == Direction.LONG).count());
-        log.info("║   - SHORT:              {:>20} ║",
-                positionAlerts.stream().filter(a -> a.getDirection() == Direction.SHORT).count());
+        log.info("║ POSITION Strategy (W1/H4):             {} ║", String.format("%6d", positionAlerts.size()));
+        log.info("║   - LONG:                              {} ║",
+                String.format("%6d", positionAlerts.stream().filter(a -> a.getDirection() == Direction.LONG).count()));
+        log.info("║   - SHORT:                             {} ║",
+                String.format("%6d", positionAlerts.stream().filter(a -> a.getDirection() == Direction.SHORT).count()));
         log.info("╚═══════════════════════════════════════════════╝");
 
-        log.info("✅ Backtest completed. Check output folder:");
-        log.info("   - swing_strategy.pine (short-term signals)");
-        log.info("   - position_strategy.pine (long-term signals)");
-        log.info("   - backtest_all_strategies.pine (combined)");
     }
 
     private static void testWaveTrendCross() {

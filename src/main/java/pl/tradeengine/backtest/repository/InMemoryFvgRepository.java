@@ -62,10 +62,26 @@ public class InMemoryFvgRepository implements FvgRepository {
         FvgZone fvg = fvgMap.get(id);
         if (fvg != null) {
             FvgZone updated = new FvgZone(
-                    fvg.getId(), fvg.getSymbol(), fvg.getTimeframe(), fvg.getDirection(),
-                    fvg.getLowerPrice(), fvg.getUpperPrice(), fvg.getStrength(),
-                    fvg.getKind(), FvgStatus.TOUCHED
+                    fvg.getId(),
+                    fvg.getSymbol(),
+                    fvg.getTimeframe(),
+                    fvg.getDirection(),
+                    fvg.getLowerPrice(),
+                    fvg.getUpperPrice(),
+                    fvg.getStrength(),
+                    fvg.getKind(),
+                    FvgStatus.TOUCHED,         // ← Status
+                    fvg.getAlertMode(),        // ← Zachowaj alert mode
+                    touchedAt,                 // ← USTAW touchedAt!
+                    fvg.getLeftZoneAt(),       // ← Zachowaj inne pola
+                    fvg.getFilledAt(),         // ← Może już być filled
+                    fvg.getExpiresAt()         // ← Zachowaj expires
             );
+//            FvgZone updated = new FvgZone(
+//                    fvg.getId(), fvg.getSymbol(), fvg.getTimeframe(), fvg.getDirection(),
+//                    fvg.getLowerPrice(), fvg.getUpperPrice(), fvg.getStrength(),
+//                    fvg.getKind(), FvgStatus.TOUCHED
+//            );
             fvgMap.put(id, updated);
         }
     }
@@ -90,10 +106,26 @@ public class InMemoryFvgRepository implements FvgRepository {
         FvgZone fvg = fvgMap.get(id);
         if (fvg != null) {
             FvgZone updated = new FvgZone(
-                    fvg.getId(), fvg.getSymbol(), fvg.getTimeframe(), fvg.getDirection(),
-                    fvg.getLowerPrice(), fvg.getUpperPrice(), fvg.getStrength(),
-                    fvg.getKind(), FvgStatus.FILLED
+                    fvg.getId(),
+                    fvg.getSymbol(),
+                    fvg.getTimeframe(),
+                    fvg.getDirection(),
+                    fvg.getLowerPrice(),
+                    fvg.getUpperPrice(),
+                    fvg.getStrength(),
+                    fvg.getKind(),
+                    FvgStatus.FILLED,          // ← Status
+                    fvg.getAlertMode(),        // ← Zachowaj alert mode
+                    fvg.getTouchedAt(),        // ← Zachowaj touchedAt (może już być)
+                    fvg.getLeftZoneAt(),       // ← Zachowaj leftZoneAt
+                    filledAt,                  // ← USTAW filledAt!
+                    expiresAt                  // ← USTAW expiresAt
             );
+//            FvgZone updated = new FvgZone(
+//                    fvg.getId(), fvg.getSymbol(), fvg.getTimeframe(), fvg.getDirection(),
+//                    fvg.getLowerPrice(), fvg.getUpperPrice(), fvg.getStrength(),
+//                    fvg.getKind(), FvgStatus.FILLED
+//            );
             fvgMap.put(id, updated);
         }
     }

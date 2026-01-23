@@ -174,6 +174,7 @@ public class BacktestRunner {
             }
 
             if (isFilled) {
+                log.debug("🎯 Marking FVG #{} as FILLED at {}", fvg.getId(), candle.closeTime());  // ← DODAJ
                 fvgRepo.markFilled(fvg.getId(), candle.closeTime(), null);
 
                 FvgZone filledFvg = fvgRepo.findById(fvg.getId()).orElseThrow();
@@ -181,6 +182,7 @@ public class BacktestRunner {
                 processEvent(event);
 
             } else if (fvg.getStatus() == FvgStatus.CREATED) {
+                log.debug("👉 Marking FVG #{} as TOUCHED at {}", fvg.getId(), candle.closeTime());  // ← DODAJ
                 fvgRepo.markTouched(fvg.getId(), candle.closeTime());
 
                 FvgZone touchedFvg = fvgRepo.findById(fvg.getId()).orElseThrow();

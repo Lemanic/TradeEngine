@@ -22,6 +22,7 @@ import pl.tradeengine.domain.util.PriceFormatter;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Slf4j
 public class GrinderStrategyScenario implements Scenario {
@@ -79,17 +80,27 @@ public class GrinderStrategyScenario implements Scenario {
     private List<AlertToSend> handleFvgInteraction(FvgZone fvg, ZonedDateTime interactionTime) {
         Symbol symbol = fvg.getSymbol();
 
-        if (!poiTimeframes.contains(fvg.getTimeframe())) return List.of();
+        log.info("🔍 handleFvgInteraction: FVG #{} filled at {}", fvg.getId(), interactionTime);
+
+        if (!poiTimeframes.contains(fvg.getTimeframe())) {
+            log.debug("  ❌ Rejected: FVG timeframe not in POI list");
+            return List.of();
+        }
 
         BiasStatus currentBias = biasRepository.getBias(symbol, biasTimeframe);
         Direction tradeDirection = resolveDirectionFromBias(currentBias);
 
-        if (tradeDirection != fvg.getDirection()) return List.of();
+        if (tradeDirection != fvg.getDirection()) {
+            log.debug("  ❌ Rejected: direction mismatch");
+            return List.of();
+        }
 
         String expectedSwingType = (tradeDirection == Direction.LONG) ? "SWING_LOW" : "SWING_HIGH";
 
         ZonedDateTime lookbackTime = interactionTime
                 .minus(triggerTimeframe.getDuration().multipliedBy(SWING_LOOKBACK_CANDLES));
+
+        log.info("  📅 Looking for {} since {}", expectedSwingType, lookbackTime);
 
         List<StoredSwingPoint> recentSwings = swingPointRepository.findRecentSwings(
                 symbol,
@@ -115,14 +126,38 @@ public class GrinderStrategyScenario implements Scenario {
         Symbol symbol = signal.symbol();
         Timeframe tf = signal.timeframe();
 
-        if (tf != triggerTimeframe) return List.of();
+        log.info("🔍 [{}] handleSwingTrigger: {} on {} type={} at {}",  // ← Dodaj nazwę strategii
+                strategyName, symbol.code(), tf, signal.type(), signal.detectedAt());
+
+        if (tf != triggerTimeframe) {
+            log.debug("  [{}] ❌ Rejected: wrong timeframe (expected {}, got {})", strategyName, triggerTimeframe, tf);
+            return List.of();
+        }
 
         BiasStatus currentBias = biasRepository.getBias(symbol, biasTimeframe);
         Direction tradeDirection = resolveDirectionFromBias(currentBias);
-        if (tradeDirection == null) return List.of();
+
+        log.debug("  [{}] Current bias: {} -> direction: {}", strategyName, currentBias, tradeDirection);
+
+        if (tradeDirection == null) {
+            log.debug("  [{}] ❌ Rejected: no bias set", strategyName);
+            return List.of();
+        }
 
         String expectedSwingType = (tradeDirection == Direction.LONG) ? "SWING_LOW" : "SWING_HIGH";
-        if (!signal.type().equals(expectedSwingType)) return List.of();
+        if (!signal.type().equals(expectedSwingType)) {
+            log.debug("  [{}] ❌ Rejected: swing type mismatch", strategyName);
+            return List.of();
+        }
+
+        ZonedDateTime lookbackTime = signal.detectedAt().minus(
+                triggerTimeframe.getDuration().multipliedBy(SWING_LOOKBACK_CANDLES)
+        );
+
+        log.info("  [{}] 📅 Lookback window: from {} to {} ({} candles = {}h)",
+                strategyName, lookbackTime, signal.detectedAt(),
+                SWING_LOOKBACK_CANDLES,
+                triggerTimeframe.getDuration().multipliedBy(SWING_LOOKBACK_CANDLES).toHours());
 
         List<FvgZone> activeContextFvgs = fvgRepository.findActiveForSymbolAndDirectionOnHigherTf(
                 symbol,
@@ -131,26 +166,82 @@ public class GrinderStrategyScenario implements Scenario {
                 poiTimeframes
         );
 
-        if (activeContextFvgs.isEmpty()) return List.of();
+        log.info("  [{}] 📦 Found {} FVGs with status TOUCHED/FILLED (before TTL filter)",
+                strategyName, activeContextFvgs.size());
 
-        return generateAlert(symbol, tradeDirection, activeContextFvgs.get(0), signal.price(), "Swing Trigger", signal.detectedAt());
+        // FILTRUJ PO TTL
+        List<FvgZone> recentFvgs = activeContextFvgs.stream()
+                .filter(fvg -> {
+                    ZonedDateTime fvgEventTime = fvg.getTouchedAt() != null
+                            ? fvg.getTouchedAt()
+                            : fvg.getFilledAt();
+
+                    if (fvgEventTime == null) {
+                        log.warn("    [{}] ⚠️ FVG #{} has no touched/filled timestamp!", strategyName, fvg.getId());
+                        return false;
+                    }
+
+                    boolean isRecent = fvgEventTime.isAfter(lookbackTime) || fvgEventTime.isEqual(lookbackTime);
+
+                    long ageHours = java.time.Duration.between(fvgEventTime, signal.detectedAt()).toHours();
+                    long maxHours = triggerTimeframe.getDuration().multipliedBy(SWING_LOOKBACK_CANDLES).toHours();
+
+                    if (isRecent) {
+                        log.info("    [{}] ✅ FVG #{}: {} on {} | Event: {} | Age: {}h / max {}h | PASSED",
+                                strategyName, fvg.getId(), fvg.getDirection(), fvg.getTimeframe(),
+                                fvgEventTime, ageHours, maxHours);
+                    }
+
+                    return isRecent;
+                })
+                .collect(Collectors.toList());
+
+        log.info("  [{}] 📦 After TTL filter: {} recent FVGs", strategyName, recentFvgs.size());
+
+        // ✅ FIX: Sprawdź recentFvgs (po filtrze)
+        if (recentFvgs.isEmpty()) {
+            log.info("  [{}] ❌ No recent FVGs - returning empty", strategyName);
+            return List.of();
+        }
+
+        // ✅ FIX: Użyj recentFvgs (po filtrze)
+        FvgZone selectedFvg = recentFvgs.get(0);
+
+        log.info("  [{}] ✅ Generating alert using FVG #{}", strategyName, selectedFvg.getId());
+
+        return generateAlert(symbol, tradeDirection, selectedFvg, signal.price(),
+                "Swing Trigger", signal.detectedAt());
     }
+//        if (activeContextFvgs.isEmpty()) return List.of();
+//
+//        return generateAlert(symbol, tradeDirection, activeContextFvgs.get(0), signal.price(), "Swing Trigger", signal.detectedAt());
+//}
 
     private List<AlertToSend> handleFvgTouchTrigger(FvgTouchedEvent event) {
         FvgZone fvg = event.fvgZone();
         Symbol symbol = fvg.getSymbol();
+        log.info("🔍 handleFvgTouchTrigger: FVG #{} touched at {}", fvg.getId(), event.touchedAt());
 
-        if (!poiTimeframes.contains(fvg.getTimeframe())) return List.of();
+        if (!poiTimeframes.contains(fvg.getTimeframe())) {
+            log.debug("  ❌ Rejected: FVG timeframe {} not in POI list", fvg.getTimeframe());
+            return List.of();
+        }
 
         BiasStatus currentBias = biasRepository.getBias(symbol, biasTimeframe);
         Direction tradeDirection = resolveDirectionFromBias(currentBias);
 
-        if (tradeDirection != fvg.getDirection()) return List.of();
+        if (tradeDirection != fvg.getDirection()){
+            log.debug("  ❌ Rejected: FVG direction {} doesn't match bias direction {}",
+                    fvg.getDirection(), tradeDirection);
+            return List.of();
+        }
 
         String expectedSwingType = (tradeDirection == Direction.LONG) ? "SWING_LOW" : "SWING_HIGH";
 
         ZonedDateTime lookbackTime = event.touchedAt()
                 .minus(triggerTimeframe.getDuration().multipliedBy(SWING_LOOKBACK_CANDLES));
+        log.info("  📅 Looking for {} since {} (lookback {} candles)",
+                expectedSwingType, lookbackTime, SWING_LOOKBACK_CANDLES);
 
         List<StoredSwingPoint> recentSwings = swingPointRepository.findRecentSwings(
                 symbol,
@@ -178,6 +269,8 @@ public class GrinderStrategyScenario implements Scenario {
     }
 
     private List<AlertToSend> generateAlert(Symbol symbol, Direction dir, FvgZone fvg, java.math.BigDecimal entryPrice, String method, ZonedDateTime timestamp) {
+        log.info("🚨 ALERT GENERATED via {}: {} {} on {} at price {} using FVG #{}",  // ← DODAJ
+                method, dir, strategyName, triggerTimeframe, entryPrice, fvg.getId());
         String description = String.format(
                 "🚀 GRINDER SETUP (%s)\n" +
                         "Pair: %s\n" +
