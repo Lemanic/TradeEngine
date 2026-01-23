@@ -13,6 +13,7 @@ import pl.tradeengine.domain.scenario.GrinderStrategyScenario;
 
 import java.math.BigDecimal;
 import java.nio.file.Paths;
+import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -83,15 +84,17 @@ public class BacktestApplication {
         // 7. Export results
         TradingViewExporter exporter = new TradingViewExporter();
 
-        // Export wszystkich alertów
-        exporter.export(alerts, Paths.get("output/backtest_all_strategies.pine"));
+// Ustaw zakres dat
+        ZonedDateTime startDate = ZonedDateTime.parse("2022-07-01T00:00:00Z");  // Połowa 2022
+        ZonedDateTime endDate = null;  // null = do końca
 
-        // Export osobno dla każdej strategii
-        exporter.export(swingAlerts, Paths.get("output/swing_strategy.pine"));
-        exporter.export(positionAlerts, Paths.get("output/position_strategy.pine"));
+// Export z date filter
+        exporter.export(alerts, Paths.get("output/backtest_all_strategies.pine"), startDate, endDate);
+        exporter.export(swingAlerts, Paths.get("output/swing_strategy.pine"), startDate, endDate);
+        exporter.export(positionAlerts, Paths.get("output/position_strategy.pine"), startDate, endDate);
 
         // 8. Statystyki
-// 8. Statystyki
+
         log.info("╔═══════════════════════════════════════════════╗");
         log.info("║         BACKTEST SUMMARY                      ║");
         log.info("╠═══════════════════════════════════════════════╣");

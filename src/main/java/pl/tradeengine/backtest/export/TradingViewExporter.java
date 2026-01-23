@@ -8,40 +8,82 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Slf4j
 public class TradingViewExporter {
 
-    private static final int MAX_ALERTS_TO_EXPORT = 400;  // ← Limit
+    private static final int MAX_ALERTS_TO_EXPORT = 400;
 
+    /**
+     * Export alerts with date range filter
+     *
+     * @param alerts All alerts from backtest
+     * @param outputPath Output Pine Script file
+     * @param startDate Start date (inclusive), null = no limit
+     * @param endDate End date (inclusive), null = no limit
+     */
+    public void export(List<AlertToSend> alerts, Path outputPath,
+                       ZonedDateTime startDate, ZonedDateTime endDate) throws IOException {
+
+        // Filtruj po zakresie dat
+        List<AlertToSend> filteredByDate = alerts.stream()
+                .filter(a -> {
+                    if (startDate != null && a.getTimestamp().isBefore(startDate)) {
+                        return false;
+                    }
+                    if (endDate != null && a.getTimestamp().isAfter(endDate)) {
+                        return false;
+                    }
+                    return true;
+                })
+                .collect(Collectors.toList());
+
+        log.info("Date filter: {} to {} → {} alerts (from {} total)",
+                startDate != null ? startDate : "beginning",
+                endDate != null ? endDate : "end",
+                filteredByDate.size(),
+                alerts.size());
+
+        // Ogranicz do MAX_ALERTS_TO_EXPORT
+        List<AlertToSend> limitedAlerts = filteredByDate.size() > MAX_ALERTS_TO_EXPORT
+                ? filteredByDate.subList(filteredByDate.size() - MAX_ALERTS_TO_EXPORT, filteredByDate.size())
+                : filteredByDate;
+
+        log.info("Exporting last {} out of {} alerts in date range to TradingView",
+                limitedAlerts.size(), filteredByDate.size());
+
+        // ... reszta export logic (bez zmian)
+        exportToPineScript(limitedAlerts, outputPath);
+    }
+
+    /**
+     * Export all alerts (bez date filter)
+     */
     public void export(List<AlertToSend> alerts, Path outputPath) throws IOException {
-        // Ogranicz do ostatnich N alertów
-        List<AlertToSend> limitedAlerts = alerts.size() > MAX_ALERTS_TO_EXPORT
-                ? alerts.subList(alerts.size() - MAX_ALERTS_TO_EXPORT, alerts.size())
-                : alerts;
+        export(alerts, outputPath, null, null);
+    }
 
-        log.info("Exporting last {} out of {} total alerts to TradingView",
-                limitedAlerts.size(), alerts.size());
-
+    private void exportToPineScript(List<AlertToSend> alerts, Path outputPath) throws IOException {
         try (BufferedWriter writer = Files.newBufferedWriter(outputPath)) {
             // Header
             writer.write("//@version=5\n");
-            writer.write("indicator('TradeEngine Backtest (Last " + limitedAlerts.size() + " Signals)', overlay=true)\n\n");
+            writer.write("indicator('TradeEngine Backtest (Last " + alerts.size() + " Signals)', overlay=true)\n\n");
 
             // Collect timestamps
-            List<Long> longTimestamps = limitedAlerts.stream()
+            List<Long> longTimestamps = alerts.stream()
                     .filter(a -> a.getDirection() == Direction.LONG)
                     .map(a -> a.getTimestamp().toInstant().toEpochMilli())
                     .collect(Collectors.toList());
 
-            List<Long> shortTimestamps = limitedAlerts.stream()
+            List<Long> shortTimestamps = alerts.stream()
                     .filter(a -> a.getDirection() == Direction.SHORT)
                     .map(a -> a.getTimestamp().toInstant().toEpochMilli())
                     .collect(Collectors.toList());
 
-            // Create arrays - split into chunks if needed
+            // Create arrays
             writer.write("// LONG timestamps\n");
             writer.write("var longTimes = array.new_int()\n");
             if (!longTimestamps.isEmpty()) {
@@ -75,17 +117,17 @@ public class TradingViewExporter {
             // Stats label
             writer.write("\n// Display info\n");
             writer.write(String.format("var label infoLabel = label.new(bar_index, high, " +
-                            "'Last %d signals\\n%d LONG / %d SHORT\\n(Total: %d)', " +
+                            "'Showing %d signals\\n%d LONG / %d SHORT', " +
                             "style=label.style_label_left, color=color.new(color.blue, 80), textcolor=color.white)\n",
-                    limitedAlerts.size(), longTimestamps.size(), shortTimestamps.size(), alerts.size()));
+                    alerts.size(), longTimestamps.size(), shortTimestamps.size()));
             writer.write("if barstate.islast\n");
             writer.write("    label.set_xy(infoLabel, bar_index + 10, high)\n");
         }
 
-        long longCount = limitedAlerts.stream().filter(a -> a.getDirection() == Direction.LONG).count();
-        long shortCount = limitedAlerts.stream().filter(a -> a.getDirection() == Direction.SHORT).count();
+        long longCount = alerts.stream().filter(a -> a.getDirection() == Direction.LONG).count();
+        long shortCount = alerts.stream().filter(a -> a.getDirection() == Direction.SHORT).count();
 
         log.info("✅ Exported {} alerts ({} LONG, {} SHORT) to: {}",
-                limitedAlerts.size(), longCount, shortCount, outputPath);
+                alerts.size(), longCount, shortCount, outputPath);
     }
 }
