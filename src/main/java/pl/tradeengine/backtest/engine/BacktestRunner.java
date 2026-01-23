@@ -54,11 +54,11 @@ public class BacktestRunner {
             fvgDetectors.put(tf, new FvgDetector());
         }
 
-        log.info("BacktestRunner initialized with {} timeframes", candlesByTf.size());
+//        log.info("BacktestRunner initialized with {} timeframes", candlesByTf.size());
     }
 
     public List<AlertToSend> run() {
-        log.info("🚀 Starting backtest...");
+//        log.info("🚀 Starting backtest...");
 
         long startTime = System.currentTimeMillis();
         int processedCandles = 0;
@@ -69,16 +69,16 @@ public class BacktestRunner {
             processedCandles++;
 
             if (processedCandles % 1000 == 0) {
-                log.info("Processed {} candles, generated {} alerts so far",
-                        processedCandles, generatedAlerts.size());
+//                log.info("Processed {} candles, generated {} alerts so far",
+//                        processedCandles, generatedAlerts.size());
             }
         }
 
         long duration = System.currentTimeMillis() - startTime;
-        log.info("📊 STATS: {} FVGs detected, {} Swings, {} Bias changes",   // ← DODAJ
-                fvgCount, swingCount, biasChangeCount);
-        log.info("✅ Backtest completed in {}ms. Processed {} candles, generated {} alerts",
-                duration, processedCandles, generatedAlerts.size());
+//        log.info("📊 STATS: {} FVGs detected, {} Swings, {} Bias changes",   // ← DODAJ
+//                fvgCount, swingCount, biasChangeCount);
+//        log.info("✅ Backtest completed in {}ms. Processed {} candles, generated {} alerts",
+//                duration, processedCandles, generatedAlerts.size());
 
         return generatedAlerts;
     }
@@ -93,8 +93,8 @@ public class BacktestRunner {
 
         // DEBUG: Log co 1000 świec dla D1
         if (tf == Timeframe.D1 && candle.openTime().getDayOfMonth() == 1) {  // ← DODAJ
-            log.debug("WT D1 at {}: wt1={}, wt2={}, cross={}, crossUp={}",
-                    candle.openTime(), wt.wt1(), wt.wt2(), wt.cross(), wt.crossUp());
+//            log.debug("WT D1 at {}: wt1={}, wt2={}, cross={}, crossUp={}",
+//                    candle.openTime(), wt.wt1(), wt.wt2(), wt.cross(), wt.crossUp());
         }
 
         // 2. Handle WaveTrend Cross
@@ -121,7 +121,7 @@ public class BacktestRunner {
             biasChangeCount++;
             BiasStatus bias = wt.crossUp() ? BiasStatus.BULLISH : BiasStatus.BEARISH;
             biasRepo.updateBias(symbol, tf, bias, "MOMENTUM_WAVE_" + tf.name());
-            log.info("📢 BIAS UPDATE: {} on {} -> {} at {}", symbol.code(), tf, bias, candle.closeTime());  // ← DODAJ timestamp
+//            log.info("📢 BIAS UPDATE: {} on {} -> {} at {}", symbol.code(), tf, bias, candle.closeTime());  // ← DODAJ timestamp
         } else {
             swingCount++;
             String swingType = wt.crossUp() ? "SWING_LOW" : "SWING_HIGH";
@@ -129,8 +129,8 @@ public class BacktestRunner {
 
             swingRepo.save(symbol, tf, swingType, price, candle.closeTime());
 
-            log.info("🌊 SWING DETECTED: {} on {} -> {} at price {} ({})",   // ← DODAJ logowanie
-                    symbol.code(), tf, swingType, price, candle.closeTime());
+//            log.info("🌊 SWING DETECTED: {} on {} -> {} at price {} ({})",   // ← DODAJ logowanie
+//                    symbol.code(), tf, swingType, price, candle.closeTime());
 
             SwingPointDetectedEvent event = new SwingPointDetectedEvent(
                     symbol, tf, swingType, price, candle.closeTime()
