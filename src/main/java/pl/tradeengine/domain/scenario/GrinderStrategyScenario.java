@@ -70,7 +70,7 @@ public class GrinderStrategyScenario implements Scenario {
         if (event instanceof FvgTouchedEvent fvgEvent) {
             return handleFvgTouchTrigger(fvgEvent);
         }
-
+        // TURN IT OFF FOR BACKTESTING
         if (event instanceof FvgFilledEvent fvgEvent) {
             return handleFvgInteraction(fvgEvent.fvgZone(), fvgEvent.filledAt());
         }
@@ -216,6 +216,9 @@ public class GrinderStrategyScenario implements Scenario {
         long timeDiffMinutes = fvgEventTime != null
                 ? java.time.Duration.between(fvgEventTime, timestamp).toMinutes()
                 : -1;
+        if (dir != Direction.LONG) {
+            return List.of();  // Pomiń SHORT
+        }
 
         log.info("╔══════════════════════════════════════════════════════════════╗");
         log.info("║  🚨 ALERT GENERATED - [{}] | {} {} @ {}",
