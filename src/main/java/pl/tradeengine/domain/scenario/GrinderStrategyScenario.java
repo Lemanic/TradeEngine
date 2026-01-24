@@ -216,9 +216,9 @@ public class GrinderStrategyScenario implements Scenario {
         long timeDiffMinutes = fvgEventTime != null
                 ? java.time.Duration.between(fvgEventTime, timestamp).toMinutes()
                 : -1;
-        if (dir != Direction.LONG) {
-            return List.of();  // Pomiń SHORT
-        }
+//        if (dir != Direction.LONG) {
+//            return List.of();  // Pomiń SHORT
+//        }
 
         log.info("╔══════════════════════════════════════════════════════════════╗");
         log.info("║  🚨 ALERT GENERATED - [{}] | {} {} @ {}",
