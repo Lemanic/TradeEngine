@@ -22,7 +22,6 @@ import pl.tradeengine.domain.util.PriceFormatter;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Slf4j
 public class GrinderStrategyScenario implements Scenario {
@@ -91,7 +90,6 @@ public class GrinderStrategyScenario implements Scenario {
             return List.of();
         }
 
-        // ✅ DODAJ TO: Sprawdź kierunek ostatniego swingu
         Direction triggerDirection = swingPointRepository.getLastSwingDirection(symbol, triggerTimeframe);
 
         if (triggerDirection != null && triggerDirection != tradeDirection) {
@@ -102,7 +100,6 @@ public class GrinderStrategyScenario implements Scenario {
 
         String expectedSwingType = (tradeDirection == Direction.LONG) ? "SWING_LOW" : "SWING_HIGH";
 
-        // ✅ ZMIEŃ: Pobierz ostatni swing (nie lookback 5 świec)
         ZonedDateTime veryOldDate = interactionTime.minusYears(1);
 
         List<StoredSwingPoint> recentSwings = swingPointRepository.findRecentSwings(
@@ -119,42 +116,7 @@ public class GrinderStrategyScenario implements Scenario {
         StoredSwingPoint lastSwing = recentSwings.get(recentSwings.size() - 1);
 
         return generateAlert(symbol, tradeDirection, fvg, lastSwing.price(),
-                "Late FVG Entry1 (Pre-Swing)", interactionTime);
-    }
-
-
-    private boolean isLastSwingAlignedWithDirection(Symbol symbol, Timeframe timeframe, Direction expectedDirection) {
-        ZonedDateTime veryOldDate = ZonedDateTime.now().minusYears(1);
-
-        List<StoredSwingPoint> lows = swingPointRepository.findRecentSwings(
-                symbol, timeframe, "SWING_LOW", veryOldDate
-        );
-        List<StoredSwingPoint> highs = swingPointRepository.findRecentSwings(
-                symbol, timeframe, "SWING_HIGH", veryOldDate
-        );
-
-        if (lows.isEmpty() || highs.isEmpty()) {
-            log.debug("No swing points found for {} {}", symbol.code(), timeframe);
-            return false;
-        }
-
-        StoredSwingPoint lastLow = lows.get(lows.size() - 1);
-        StoredSwingPoint lastHigh = highs.get(highs.size() - 1);
-
-        // Ostatni swing to LOW = momentum bullish
-        boolean lastSwingWasLow = lastLow.detectedAt().isAfter(lastHigh.detectedAt());
-
-        if (expectedDirection == Direction.LONG && !lastSwingWasLow) {
-            log.debug("Last swing was HIGH but expected LONG direction - rejecting");
-            return false;
-        }
-
-        if (expectedDirection == Direction.SHORT && lastSwingWasLow) {
-            log.debug("Last swing was LOW but expected SHORT direction - rejecting");
-            return false;
-        }
-
-        return true;
+                "Late FVG Entry (Pre-Swing)", interactionTime);
     }
 
     private List<AlertToSend> handleSwingTrigger(SwingPointDetectedEvent signal) {
@@ -202,7 +164,7 @@ public class GrinderStrategyScenario implements Scenario {
 
                     return isRecent;
                 })
-                .collect(Collectors.toList());
+                .toList();
 
         if (recentFvgs.isEmpty()) {
             return List.of();
@@ -227,12 +189,9 @@ public class GrinderStrategyScenario implements Scenario {
             return List.of();
         }
 
-        // ✅ DODAJ TO: Sprawdź kierunek ostatniego swingu
         Direction triggerDirection = swingPointRepository.getLastSwingDirection(symbol, triggerTimeframe);
 
         if (triggerDirection != null && triggerDirection != tradeDirection) {
-            log.debug("Trigger swing direction {} conflicts with trade direction {} - rejecting alert",
-                    triggerDirection, tradeDirection);
             return List.of();
         }
 
@@ -254,32 +213,7 @@ public class GrinderStrategyScenario implements Scenario {
         StoredSwingPoint lastSwing = recentSwings.get(recentSwings.size() - 1);
 
         return generateAlert(symbol, tradeDirection, fvg, lastSwing.price(),
-                "Late FVG Entry2 (Pre-Swing)", event.touchedAt());
-    }
-
-
-    private Direction getLastSwingDirection(Symbol symbol, Timeframe timeframe, ZonedDateTime referenceTime) {
-        ZonedDateTime veryOldDate = referenceTime.minusYears(1);
-
-        List<StoredSwingPoint> lows = swingPointRepository.findRecentSwings(
-                symbol, timeframe, "SWING_LOW", veryOldDate
-        );
-        List<StoredSwingPoint> highs = swingPointRepository.findRecentSwings(
-                symbol, timeframe, "SWING_HIGH", veryOldDate
-        );
-
-        if (lows.isEmpty() || highs.isEmpty()) {
-            return null; // Jak NEUTRAL
-        }
-
-        StoredSwingPoint lastLow = lows.get(lows.size() - 1);
-        StoredSwingPoint lastHigh = highs.get(highs.size() - 1);
-
-        // Ostatni swing to LOW = bullish momentum = LONG
-        // Ostatni swing to HIGH = bearish momentum = SHORT
-        return lastLow.detectedAt().isAfter(lastHigh.detectedAt())
-                ? Direction.LONG
-                : Direction.SHORT;
+                "Late FVG Entry (Pre-Swing)", event.touchedAt());
     }
 
     private Direction resolveDirectionFromBias(BiasStatus bias) {
@@ -293,6 +227,7 @@ public class GrinderStrategyScenario implements Scenario {
         long timeDiffMinutes = fvgEventTime != null
                 ? java.time.Duration.between(fvgEventTime, timestamp).toMinutes()
                 : -1;
+
 //        if (dir != Direction.LONG) {
 //            return List.of();  // Pomiń SHORT
 //        }
