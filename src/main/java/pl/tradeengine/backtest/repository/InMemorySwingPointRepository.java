@@ -1,6 +1,7 @@
 package pl.tradeengine.backtest.repository;
 
 import lombok.extern.slf4j.Slf4j;
+import pl.tradeengine.domain.model.Direction;
 import pl.tradeengine.domain.model.StoredSwingPoint;
 import pl.tradeengine.domain.model.Symbol;
 import pl.tradeengine.domain.model.Timeframe;
@@ -31,5 +32,10 @@ public class InMemorySwingPointRepository implements SwingPointRepository {
                 .filter(s -> s.type().equals(type))
                 .filter(s -> s.detectedAt().isAfter(since))
                 .toList();
+    }
+
+    @Override
+    public Direction getLastSwingDirection(Symbol symbol, Timeframe timeframe) {
+        return null;
     }
 }
