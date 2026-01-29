@@ -116,7 +116,7 @@ public class GrinderStrategyScenario implements Scenario {
         StoredSwingPoint lastSwing = recentSwings.get(recentSwings.size() - 1);
 
         return generateAlert(symbol, tradeDirection, fvg, lastSwing.price(),
-                "Late FVG Entry (Pre-Swing)", interactionTime);
+                "Late FVG filled Entry (Pre-Swing)", interactionTime);
     }
 
     private List<AlertToSend> handleSwingTrigger(SwingPointDetectedEvent signal) {
@@ -213,7 +213,7 @@ public class GrinderStrategyScenario implements Scenario {
         StoredSwingPoint lastSwing = recentSwings.get(recentSwings.size() - 1);
 
         return generateAlert(symbol, tradeDirection, fvg, lastSwing.price(),
-                "Late FVG Entry (Pre-Swing)", event.touchedAt());
+                "Late FVG touched Entry (Pre-Swing)", event.touchedAt());
     }
 
     private Direction resolveDirectionFromBias(BiasStatus bias) {
