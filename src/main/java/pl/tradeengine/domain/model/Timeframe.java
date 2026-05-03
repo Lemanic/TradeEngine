@@ -6,8 +6,9 @@ import java.time.Duration;
 
 @Getter
 public enum Timeframe {
+    M1(Duration.ofMinutes(1)),
     M3(Duration.ofMinutes(5)),
-    M5(Duration.ofMinutes(5)),
+    M5(Duration.ofMinutes(3)),
     M15(Duration.ofMinutes(15)),
     H1(Duration.ofHours(1)),
     H4(Duration.ofHours(4)),
