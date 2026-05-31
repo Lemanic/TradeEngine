@@ -1,5 +1,6 @@
 package pl.tradeengine;
 
+import pl.tradeengine.application.dto.PriceUpdateDto;
 import pl.tradeengine.backtest.repository.InMemoryFvgRepository;
 import pl.tradeengine.domain.event.SwingPointDetectedEvent;
 import pl.tradeengine.domain.model.Direction;
@@ -9,6 +10,7 @@ import pl.tradeengine.domain.model.FvgStatus;
 import pl.tradeengine.domain.model.FvgZone;
 import pl.tradeengine.domain.model.Symbol;
 import pl.tradeengine.domain.model.Timeframe;
+import pl.tradeengine.domain.port.FvgRepository;
 
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
@@ -71,5 +73,20 @@ public final class TestFixtures {
 
     public static DivergenceSignal divergence(Timeframe tf, Direction direction, ZonedDateTime detectedAt) {
         return new DivergenceSignal(null, BTC, tf, direction, 1.0, detectedAt);
+    }
+
+    /** PriceUpdateDto with BTC/H1 defaults — most handlePriceUpdate tests only care about high/low/close. */
+    public static PriceUpdateDto priceUpdate(Timeframe tf, BigDecimal high, BigDecimal low, BigDecimal close) {
+        return new PriceUpdateDto(BTC.code(), tf.name(), "PRICE_UPDATE", high, low, close);
+    }
+
+    /**
+     * Saves an FVG in any status directly to the stateful fake repository.
+     * Returns the same instance (the fake mutates in place), so callers can chain setters.
+     */
+    public static FvgZone saveFvg(FvgRepository repo, Timeframe tf, Direction direction,
+                                  BigDecimal lower, BigDecimal upper, FvgStatus status) {
+        FvgZone f = new FvgZone(null, BTC, tf, direction, lower, upper, 1.0, FvgKind.FVG, status);
+        return repo.save(f);
     }
 }
