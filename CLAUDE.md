@@ -84,6 +84,31 @@ Strategies are not selected by classpath presence. Each `Scenario` bean declares
 
 `GrinderStrategyScenario` is parameterized by **biasTimeframe** (D1 or W1, where market bias is derived), **poiTimeframes** (HTF FVG zones to look for), and **triggerTimeframe** (LTF swing-point or FVG-touch trigger). Two beans of this class are wired in `GrinderStrategyConfig` — `GRINDER_SWING_D1_H1` and `GRINDER_POSITION_W1_H4` — so the same code drives swing- and position-trading variants. The `triggerTimeframe` in YAML must match the value passed in `GrinderStrategyConfig`, otherwise `ScenarioRegistry.getScenariosFor` will skip the scenario.
 
+### FvgLtfConfirmationScenario — the only enabled strategy in dev
+
+`name()` = `"FVG_LTF_CONFIRMATION"` · `id()` = `3L` · registered as `@Component` (no factory config needed)
+
+This strategy is `enabled: true` in `application-dev.yml` across timeframes `[M1, M3, M5, M15, H1, H4]`.
+It operates in two layers: a structural **HTF context** (H1/H4 FVG zone) and a **LTF confirmation trigger**.
+
+**Signal flow:**
+
+1. An HTF FVG on **H1 or H4** is touched (`FvgTouchedEvent`) → the zone becomes "armed". No alert is fired at this stage — only logging. The zone stays armed as long as its status is `TOUCHED` (not `FILLED`/`CONSUMED`).
+2. While any HTF FVG is armed for the given symbol+direction, the strategy listens for one of two LTF triggers:
+    - **Divergence trigger** — `DivergenceDetectedEvent` on any of `[M1, M3, M5, M15, H1, H4]`, but with a minimum count requirement within a rolling `DIV_LOOKBACK_CANDLES = 40` candle window:
+        - `M1` → 4 divergences minimum
+        - `M3` → 2 divergences minimum
+        - `M5, M15, H1, H4` → 1 divergence (single is sufficient given HTF context)
+    - **LTF FVG trigger** — `FvgCreatedEvent` on `[M5, M15, H1]` in the **same direction** as the armed HTF FVG
+3. Either trigger fires an `AlertToSend`. Risk management fields (`sl`, `tp`) are intentionally `ZERO` / `Optional.empty()` — not in scope yet.
+
+**HTF FVG selection rule:** when multiple armed HTF FVGs exist for the same symbol+direction, H4 is preferred over H1 (higher TF context is stronger). This is hardcoded in `findArmedHtfFvg()` via `HTF_CONTEXT_TIMEFRAMES` index sort — do not reorder that list without understanding the impact.
+
+**Important distinctions from GrinderStrategy:**
+- This scenario does **not** use `BiasRepository` or `SwingPointRepository` — only `FvgRepository` and `DivergenceRepository`.
+- `BIAS_TIMEFRAMES = {D1, W1}` in `WebhookProcessingService` is **unrelated** to this strategy's timeframe sets. FVG_LTF_CONFIRMATION has its own `HTF_CONTEXT_TIMEFRAMES = {H1, H4}` and `LTF_DIVERGENCE_TIMEFRAMES = {M1…H4}`.
+- This strategy has **no backtest path** — it is Spring-only and cannot be run via `BacktestApplication`.
+
 ### Bias vs. swing points split
 
 In `WebhookProcessingService.handleMomentumAlert`, the set `BIAS_TIMEFRAMES = {D1, W1}` decides whether an incoming momentum alert updates the bias (via `BiasRepository`) or registers a swing point (via `SwingPointRepository`). The same split is mirrored in `BacktestRunner` (`handleWaveTrendCross`). Keep them in sync.
