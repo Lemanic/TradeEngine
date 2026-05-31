@@ -22,6 +22,9 @@ app:
     - name: "GRINDER_POSITION_W1_H4"
       enabled: true
       timeframes: [ H4 ]
+    - name: FVG_LTF_CONFIRMATION
+      enabled: true
+      timeframes: [ M1, M3, M5, M15, H1, H4 ]
   telegram:
     bot-token: ${TELEGRAM_BOT_TOKEN}
     chat-id: ${TELEGRAM_CHAT_ID}
