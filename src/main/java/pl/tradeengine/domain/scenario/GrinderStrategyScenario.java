@@ -66,13 +66,13 @@ public class GrinderStrategyScenario implements Scenario {
         }
 
         // TURN IT OFF FOR BACKTESTING
-//        if (event instanceof FvgTouchedEvent fvgEvent) {
-//            return handleFvgTouchTrigger(fvgEvent);
-//        }
-//        // TURN IT OFF FOR BACKTESTING
-//        if (event instanceof FvgFilledEvent fvgEvent) {
-//            return handleFvgInteraction(fvgEvent.fvgZone(), fvgEvent.filledAt());
-//        }
+        if (event instanceof FvgTouchedEvent fvgEvent) {
+            return handleFvgTouchTrigger(fvgEvent);
+        }
+        // TURN IT OFF FOR BACKTESTING
+        if (event instanceof FvgFilledEvent fvgEvent) {
+            return handleFvgInteraction(fvgEvent.fvgZone(), fvgEvent.filledAt());
+        }
 
         return List.of();
     }
