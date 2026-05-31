@@ -3,6 +3,7 @@ package pl.tradeengine;
 import pl.tradeengine.backtest.repository.InMemoryFvgRepository;
 import pl.tradeengine.domain.event.SwingPointDetectedEvent;
 import pl.tradeengine.domain.model.Direction;
+import pl.tradeengine.domain.model.DivergenceSignal;
 import pl.tradeengine.domain.model.FvgKind;
 import pl.tradeengine.domain.model.FvgStatus;
 import pl.tradeengine.domain.model.FvgZone;
@@ -56,5 +57,19 @@ public final class TestFixtures {
     /** BEARISH momentum produces SWING_HIGH. */
     public static SwingPointDetectedEvent bearishSwingOnH1(ZonedDateTime at) {
         return swingEvent(Timeframe.H1, "SWING_HIGH", at);
+    }
+
+    public static FvgZone saveFilledFvg(InMemoryFvgRepository repo,
+                                        Timeframe tf,
+                                        Direction direction,
+                                        ZonedDateTime filledAt) {
+        FvgZone fvg = fvgZone(tf, direction, FvgStatus.CREATED);
+        FvgZone saved = repo.save(fvg);
+        repo.markFilled(saved.getId(), filledAt, filledAt.plusDays(1));
+        return repo.findById(saved.getId()).orElseThrow();
+    }
+
+    public static DivergenceSignal divergence(Timeframe tf, Direction direction, ZonedDateTime detectedAt) {
+        return new DivergenceSignal(null, BTC, tf, direction, 1.0, detectedAt);
     }
 }
