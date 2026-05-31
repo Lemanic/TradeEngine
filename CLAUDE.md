@@ -22,6 +22,36 @@ The dev profile is active by default (`application.yml`) and still reads these e
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` — referenced in dev YAML too, but the Telegram publisher bean is `@Profile("prod")` only; in dev `LoggingAlertPublisher` is wired instead.
 
 Activate prod against PostgreSQL (`localhost:5432/postgres`) with `-Dspring.profiles.active=prod`.
+u
+## Testing
+
+### Stack
+- JUnit 5 + Mockito (already on the classpath via `spring-boot-starter-test`)
+- AssertJ for fluent assertions
+- Use `@ExtendWith(MockitoExtension.class)` for pure unit tests (no Spring context)
+- Use `@SpringBootTest` + `@ActiveProfiles("test")` only for integration tests that need the full context
+
+### Test profile
+Create `src/test/resources/application-test.yml` with H2 datasource and stub env vars:
+```yaml
+spring.datasource.url: jdbc:h2:mem:testdb
+DB_USER: sa
+DB_PASSWORD: ""
+TELEGRAM_BOT_TOKEN: test-token
+TELEGRAM_CHAT_ID: "0"
+```
+
+### Conventions
+- Test class name: `<ClassName>Test` in the same package under `src/test/`
+- One test class per production class
+- Use `InMemory*Repository` adapters (already exist in `backtest/`) as fakes — **do not mock repositories**
+- Builder pattern for domain fixtures: create a `TestFixtures` utility class in `src/test/java/pl/tradeengine/`
+- For `GrinderStrategyScenario` tests: instantiate directly (like `BacktestApplication` does), don't load Spring
+
+### What NOT to test
+- DTOs and Lombok-generated code
+- `TradeengineApplication` (covered by existing `contextLoads`)
+- Pine Script output formatting in `backtest/`
 
 ## Architecture
 
