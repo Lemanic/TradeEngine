@@ -18,4 +18,6 @@ public interface DivergenceRepository {
     Optional<DivergenceSignal> findMostRecentByDirection(Symbol symbol, Timeframe timeframe, Direction direction, ZonedDateTime since);
     List<DivergenceSignal> findAllByDirectionSince(Symbol symbol, Timeframe timeframe, Direction direction, ZonedDateTime since);
 
+    List<DivergenceSignal> findAll();
+
 }

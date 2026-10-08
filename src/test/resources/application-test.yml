@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+# Stubs for the placeholders the dev/prod YAML reads from the environment.
+DB_USER: sa
+DB_PASSWORD: ""
+TELEGRAM_BOT_TOKEN: test-token
+TELEGRAM_CHAT_ID: "0"
+
+portfolio:
+  # No scheduler in tests — snapshots are triggered explicitly.
+  enabled: false
+  cmc:
+    api-key: ""

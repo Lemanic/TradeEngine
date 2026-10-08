@@ -64,6 +64,14 @@ public class DivergencePersistenceAdapter implements DivergenceRepository {
                 .toList();
     }
 
+    @Override
+    public List<DivergenceSignal> findAll() {
+        return jpaRepository.findAll()
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
     private DivergenceSignal toDomain(DivergenceEntity entity) {
         return new DivergenceSignal(
                 entity.getId(),
