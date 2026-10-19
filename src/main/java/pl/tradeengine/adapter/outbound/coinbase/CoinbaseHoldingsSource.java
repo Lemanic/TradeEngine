@@ -22,9 +22,14 @@ import java.util.stream.Collectors;
  * {@code 7E-7} BTC and {@code 3.6E-9} ETH, together worth a few cents — and listing those as
  * positions would be noise, not information.
  *
- * <p>{@code available_balance} is used rather than adding {@code hold}: funds reserved against an
- * open order are still owned, but Coinbase reports them separately and the whitelist already
- * decides what counts. If an open order ever hides a meaningful amount, that is the place to look.
+ * <p>The amount is {@code available_balance + hold}, because funds reserved against an open order
+ * are still owned. Reading only {@code available_balance} — as this class did at first — hid a
+ * limit order worth over 1000 USD: the portfolio showed 18 USD on an account holding far more,
+ * silently, with no {@code stale} flag and no {@code complete=false} to hint at it. The two fields
+ * are disjoint, so summing them cannot double count.
+ *
+ * <p>{@code min-amount} is checked against that sum. Checking only the available part would drop
+ * a position whose balance is entirely locked in an order, which is the very case this fixes.
  */
 public class CoinbaseHoldingsSource implements HoldingsSource {
 
@@ -63,11 +68,11 @@ public class CoinbaseHoldingsSource implements HoldingsSource {
 
         for (Account account : client.accounts()) {
             Currency currency = account.currency() == null ? null : whitelist.get(account.currency());
-            if (currency == null || account.availableBalance() == null) {
+            if (currency == null) {
                 continue;
             }
-            BigDecimal amount = account.availableBalance().value();
-            if (amount == null || amount.signum() <= 0) {
+            BigDecimal amount = value(account.availableBalance()).add(value(account.hold()));
+            if (amount.signum() <= 0) {
                 continue;
             }
             if (amount.compareTo(currency.minAmount()) < 0) {
@@ -80,5 +85,13 @@ public class CoinbaseHoldingsSource implements HoldingsSource {
 
         log.info("{}: read {} whitelisted balance(s) on {}", label, holdings.size(), network);
         return holdings;
+    }
+
+    /** A missing balance object or value counts as zero, not as a reason to skip the account. */
+    private static BigDecimal value(CoinbaseAccountsResponse.Balance balance) {
+        if (balance == null || balance.value() == null) {
+            return BigDecimal.ZERO;
+        }
+        return balance.value();
     }
 }

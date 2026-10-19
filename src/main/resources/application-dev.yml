@@ -102,6 +102,10 @@ portfolio:
       - { code: WLD,  asset: WLD,  cmc-id: 13502 }
       - { code: BTC,  asset: BTC,  cmc-id: 1,    min-amount: 0.0001 }
       - { code: ETH,  asset: ETH,  cmc-id: 1027, min-amount: 0.001 }
+      # TAO kupowane na Coinbase. Osobna pozycja od źródła "TAO staking": klucz agregacji to
+      # (source, network, asset, cmcId), a source się różni — więc nie ma podwójnego liczenia.
+      - { code: TAO,  asset: TAO,  cmc-id: 22974 }
+      - { code: ORCA, asset: ORCA, cmc-id: 11165 }
   hyperliquid:
     base-url: https://api.hyperliquid.xyz
     connect-timeout: 5s

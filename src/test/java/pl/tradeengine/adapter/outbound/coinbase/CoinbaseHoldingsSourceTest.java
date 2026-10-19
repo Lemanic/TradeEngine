@@ -48,10 +48,15 @@ class CoinbaseHoldingsSourceTest {
     }
 
     private static String account(String currency, String available) {
+        return account(currency, available, "0");
+    }
+
+    private static String account(String currency, String available, String hold) {
         return """
                 {"uuid":"u-%1$s","name":"%1$s Wallet","currency":"%1$s",
                  "available_balance":{"value":"%2$s","currency":"%1$s"},
-                 "hold":{"value":"0","currency":"%1$s"}}""".formatted(currency, available);
+                 "hold":{"value":"%3$s","currency":"%1$s"}}"""
+                .formatted(currency, available, hold);
     }
 
     @Test
@@ -105,6 +110,57 @@ class CoinbaseHoldingsSourceTest {
                         """.formatted(account("BTC", "0.0001")), MediaType.APPLICATION_JSON));
 
         assertThat(source.fetchHoldings()).extracting(Holding::asset).containsExactly("BTC");
+    }
+
+    @Test
+    void countsFundsHeldAgainstAnOpenOrder() {
+        server.expect(requestTo(ACCOUNTS))
+                .andRespond(withSuccess("""
+                        {"accounts":[%s],"has_next":false}
+                        """.formatted(account("USDC", "18.04", "1000.5")),
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(source.fetchHoldings())
+                .extracting(Holding::asset, h -> h.amount().toPlainString())
+                .containsExactly(tuple("USDC", "1018.54"));
+    }
+
+    @Test
+    void keepsAPositionWhoseBalanceIsEntirelyLockedInAnOrder() {
+        server.expect(requestTo(ACCOUNTS))
+                .andRespond(withSuccess("""
+                        {"accounts":[%s],"has_next":false}
+                        """.formatted(account("BTC", "0", "0.02")), MediaType.APPLICATION_JSON));
+
+        assertThat(source.fetchHoldings())
+                .extracting(Holding::asset, h -> h.amount().toPlainString())
+                .containsExactly(tuple("BTC", "0.02"));
+    }
+
+    @Test
+    void appliesTheMinimumToTheSumRatherThanTheAvailablePartAlone() {
+        // Dust: 0.00005 available + 0.00004 on hold = 0.00009, czyli pod minimum 0.0001.
+        server.expect(requestTo(ACCOUNTS))
+                .andRespond(withSuccess("""
+                        {"accounts":[%s],"has_next":false}
+                        """.formatted(account("BTC", "0.00005", "0.00004")),
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(source.fetchHoldings()).isEmpty();
+    }
+
+    @Test
+    void treatsAMissingHoldObjectAsZero() {
+        server.expect(requestTo(ACCOUNTS))
+                .andRespond(withSuccess("""
+                        {"accounts":[{"uuid":"u","name":"USDC Wallet","currency":"USDC",
+                         "available_balance":{"value":"12.5","currency":"USDC"}}],
+                         "has_next":false}
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThat(source.fetchHoldings())
+                .extracting(Holding::asset, h -> h.amount().toPlainString())
+                .containsExactly(tuple("USDC", "12.5"));
     }
 
     @Test
