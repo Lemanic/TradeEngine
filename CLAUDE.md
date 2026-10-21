@@ -29,7 +29,6 @@ Activate prod against PostgreSQL (`localhost:5432/postgres`) with `-Dspring.prof
 The portfolio module adds `CMC_API_KEY`, `PORTFOLIO_RABBY_ADDRESS` and
 `PORTFOLIO_TREZOR_EVM_ADDRESS` — all optional at startup, see [Portfolio module](#portfolio-module).
 Supply them outside the repository, in `config/application-{profile}.yml` (git-ignored).
-u
 ## Testing
 
 ### Stack
@@ -141,7 +140,7 @@ is the source of truth for the response shapes**; this section describes the imp
     → application.service.portfolio.PortfolioSnapshotService
         → domain.port.portfolio.HoldingsSource     (EVM via JSON-RPC, xpub via Blockbook,
                                                    Hyperliquid via /info, Coinbase via CDP,
-                                                   ilości wpisane ręcznie)
+                                                   manually entered amounts)
         → domain.port.portfolio.PriceProvider      (CoinMarketCap, USD + PLN)
         → domain.port.portfolio.PortfolioSnapshotRepository  (JPA; one hour, one snapshot)
 
@@ -151,120 +150,125 @@ GET /api/portfolio/summary | /history
 
 `config.HoldingsSourceRegistry` builds the sources from configuration: EVM wallet entries are
 grouped by label, so `Rabby` on ethereum + arbitrum is one source, while every xpub becomes a
-source of its own. **Etykieta decyduje o podziale w `summary.sources[]` i w donucie**, więc dobiera
-się ją pod to, co ma być widoczne osobno, a nie pod to, gdzie leżą klucze:
+source of its own. **The label decides the split in `summary.sources[]` and in the donut**, so it
+is chosen for what should be visible separately, not for where the keys happen to live:
 
-- `Trezor` to adres EVM na bsc **i** xpub Bitcoina — jedna etykieta, jeden kawałek donuta,
-  a `HoldingsSource.networks()` zawęża awarię do właściwej połowy.
-- `Hyperliquid` to **ten sam adres co `Rabby`**, ale osobna etykieta, bo ten kapitał ma być
-  w donucie osobnym kawałkiem. Dlatego korzysta z `PORTFOLIO_RABBY_ADDRESS`, a nazywa się inaczej.
+- `Trezor` is an EVM address on bsc **and** a Bitcoin xpub — one label, one donut slice, while
+  `HoldingsSource.networks()` narrows a failure down to the affected half.
+- `Hyperliquid` is **the same address as `Rabby`**, but a separate label, because that capital is
+  meant to be its own slice in the donut. Hence it uses `PORTFOLIO_RABBY_ADDRESS` under a
+  different name.
 
-Zmiana etykiety zeruje historię carry-forward dla tego źródła: zapisane pozycje mają starą
-nazwę w kolumnie `source`, więc do pierwszego udanego snapshotu nie ma z czego przenosić. Samo
-się naprawia po jednym cyklu.
+Renaming a label resets the carry-forward history for that source: stored positions carry the old
+name in the `source` column, so until the first successful snapshot there is nothing to carry
+forward from. It heals itself after one cycle.
 
-**Dodając źródło, uprzedź repozytorium dashboardu — ale powód jest inny, niż tu wcześniej stało.**
-Pierwsza wersja tej notatki twierdziła, że paleta donuta działa tylko dla trzech źródeł i że
-czwarte wymaga zmiany wartości kolorów. **Oba zdania są nieprawdziwe** i warto wiedzieć dlaczego,
-bo ta sama pomyłka zmyliła najpierw tamtą stronę, a potem mnie.
+**When adding a source, warn the dashboard repository — but the reason is not what used to stand
+here.** The first version of this note claimed the donut palette only works for three sources and
+that a fourth requires changing the color values. **Both statements are false**, and it is worth
+knowing why, because the same mistake misled that side first and then me.
 
-Wiążące jest **uporządkowanie serii, nie dobór kolorów**. Walidator kontrastu inaczej traktuje
-wykresy, w których stykają się tylko sąsiedzi (słupki, linie), a inaczej te, w których zetknąć się
-może każda para. Donut wpadał do drugiej kategorii **tylko dlatego, że front sortował wycinki
-malejąco po wartości** — przy takim sortowaniu dowolne dwa źródła mogą stać się sąsiadami.
-Zmierzone przez nich, w obu motywach:
+What binds is **the ordering of the series, not the choice of colors**. The contrast validator
+treats charts where only neighbours touch (bars, lines) differently from those where any pair can
+touch. The donut fell into the second category **only because the front end sorted the slices by
+value, descending** — with that sorting any two sources can become neighbours. Measured by them,
+in both themes:
 
-| Jak używana jest paleta | Ile źródeł przechodzi |
+| How the palette is used | Sources that pass |
 | --- | --- |
-| kolejność po wartości (każda para możliwa) | **4**, i tylko dwa zestawy z ośmiu kolorów zdają; przy **5** nie zdaje żaden z 56 podzbiorów |
-| kolejność stała (po nazwie, sąsiedztwo niezmienne) | **6** — obecna paleta zdaje wszystkie kontrole |
+| ordered by value (every pair possible) | **4**, and only two sets out of the eight colors pass; at **5** none of the 56 subsets passes |
+| fixed order (by name, neighbours invariant) | **6** — the current palette passes every check |
 
-Czyli przy pięciu źródłach przemalowanie hexów **nie pomoże**: trzeba albo zmniejszyć liczbę serii
-(zwinąć w „Inne"), albo rozbić na panele, albo ustalić kolejność wycinków na stałe. To zmiana
-w tym, jak czyta się wykres, więc **decyzja użytkownika**, nie nasza ani ich.
+So with five sources, repainting the hexes **will not help**: you have to either reduce the number
+of series (fold them into "Other"), or split them across panels, or fix the slice order. That
+changes how the chart is read, so it is **the user's decision**, neither ours nor theirs.
 
-Stan na dziś: **pięć źródeł** — `Hyperliquid`, `TAO staking`, `Trezor`, `TRB staking`, `Rabby`.
-Przy sortowaniu wycinków po wartości to zakres, w którym **żaden dobór kolorów z udokumentowanej
-ósemki nie zdaje kontroli w obu motywach** (56 sprawdzonych podzbiorów). Donut działa i każdy
-wycinek ma etykietę, ale próg kontrastu jest przekroczony dla którejś pary sąsiednich.
+As of today: **five sources** — `Hyperliquid`, `TAO staking`, `Trezor`, `TRB staking`, `Rabby`.
+With slices sorted by value, that is the range in which **no choice of colors from the documented
+eight passes the checks in both themes** (56 subsets checked). The donut works and every slice is
+labelled, but the contrast threshold is exceeded for some pair of neighbours.
 
-Rozwiązanie **nie leży po stronie backendu ani palety**: trzeba albo zwinąć najmniejsze źródła
-w „Inne", albo rozbić na panele, albo ustalić kolejność wycinków na stałe (wtedy obecna paleta
-zdaje dla sześciu). To decyzja użytkownika o tym, jak czyta się jego wykres — czeka na nią.
+The fix lies **neither in the backend nor in the palette**: either fold the smallest sources into
+"Other", or split them across panels, or fix the slice order (the current palette then passes for
+six). This is the user's decision about how his own chart is read — it is waiting for him.
 
-Szóste źródło dodawaj świadomie: przy stałej kolejności zmieści się bez zmian, przy sortowaniu
-po wartości pogłębi problem.
+Add a sixth source deliberately: with a fixed order it fits with no changes, with sorting by value
+it deepens the problem.
 
 ### Degradation rules
 
 Fail softly, but never invent numbers:
 
-| Co się psuje | Zachowanie |
+| What breaks | Behavior |
 | --- | --- |
-| Źródło rzuca wyjątkiem | Ilości przeniesione wstecz (reguła niżej), pozycje `stale=true`, snapshot `complete=false` |
-| Brak ceny dla `cmcId` | Ostatnia znana cena z bazy, pozycja `stale=true`, `complete` bez zmian |
-| Brak ceny i brak historii | Pozycja pominięta, `complete=false` — zero kłamałoby o wartości portfela |
-| Ceny niedostępne (401/429/sieć) | Nic nie zapisane, tylko `ERROR` w logu |
-| Brak skonfigurowanego źródła | Nic nie zapisane, `WARN` w logu |
+| A source throws | Amounts carried forward (rule below), positions `stale=true`, snapshot `complete=false` |
+| No price for a `cmcId` | Last known price from the database, position `stale=true`, `complete` unchanged |
+| No price and no history | Position skipped, `complete=false` — a zero would lie about the portfolio's value |
+| Prices unavailable (401/429/network) | Nothing stored, only an `ERROR` in the log |
+| No source configured | Nothing stored, a `WARN` in the log |
 
-#### Przenoszenie ilości, gdy źródło padnie
+#### Carrying amounts forward when a source fails
 
-Cel: brak dziury w sumie i brak uskoku na wykresie, przy jednoczesnym braku kłamstwa. Serwis
-idzie snapshotami **wstecz** i zatrzymuje się na pierwszej rozstrzygającej odpowiedzi:
+The goal: no hole in the total and no step on the chart, while still not lying. The service walks
+snapshots **backwards** and stops at the first conclusive answer:
 
-| Co widzi w snapshocie | Wniosek |
+| What it sees in a snapshot | Conclusion |
 | --- | --- |
-| są pozycje tego źródła | przenosi te ilości, wycenia **bieżącymi** cenami, `stale=true` |
-| brak pozycji, ale snapshot `complete` | w tym snapshocie **wszystkie** źródła odpowiedziały, więc brak pozycji to samo źródło mówiące „już tego nie mam" — przeniesienie starszej ilości wskrzesiłoby coś sprzedanego, więc nie przenosi nic |
-| brak pozycji, snapshot `complete=false` | nierozstrzygające, bo źródło mogło wtedy też padać — szuka dalej wstecz |
+| positions from that source are present | carries those amounts forward, prices them at **current** prices, `stale=true` |
+| no positions, but the snapshot is `complete` | in that snapshot **every** source answered, so the absence of positions is the source itself saying "I no longer hold this" — carrying an older amount forward would resurrect something sold, so it carries nothing |
+| no positions, snapshot `complete=false` | inconclusive, because the source may have been failing then too — it keeps looking further back |
 
-Okno przeszukiwania ogranicza `portfolio.carry-forward-max-age` (domyślnie 7 dni). Starsza ilość
-nie jest używana: mogła w tym czasie zostać sprzedana, a zła liczba jest gorsza niż uczciwa dziura.
+The search window is bounded by `portfolio.carry-forward-max-age` (7 days by default). An older
+amount is not used: it could have been sold in the meantime, and a wrong number is worse than an
+honest hole.
 
-Rozróżnienie „opróżnione" od „nieosiągalne" jest tu **istotą**, a nie detalem. Pierwsza wersja
-tego mechanizmu czytała tylko najnowszy snapshot i gubiła pozycję na zawsze, gdy w nim jej
-zabrakło; naiwna poprawka „szukaj aż znajdziesz" wskrzeszałaby sprzedane aktywa. Oba zachowania
-są zablokowane testami (`doesNotResurrectAPositionThatTheSourceReportedAsEmptied`,
+The distinction between "emptied" and "unreachable" is **the essence** here, not a detail. The
+first version of this mechanism read only the newest snapshot and lost a position forever once it
+was missing from it; the naive fix — "keep looking until you find something" — would resurrect
+sold assets. Both behaviors are pinned by tests
+(`doesNotResurrectAPositionThatTheSourceReportedAsEmptied`,
 `looksPastAnInconclusiveSnapshotInsteadOfLosingThePosition`).
 
-Zmierzone na żywo przez zepsucie RPC Ethereum: suma spadła z 5 321,60 na 5 321,38 USD, czyli
-o 0,004 % wynikające z ruchu cen — bez tego mechanizmu spadłaby o 317,51 USD.
+Measured live by breaking the Ethereum RPC: the total fell from 5,321.60 to 5,321.38 USD, i.e. by
+0.004% stemming from price movement — without this mechanism it would have fallen by 317.51 USD.
 
-`taken_at` jest zawsze obcięte do pełnej godziny UTC i ma `UNIQUE` — powtórny snapshot w tej samej
-godzinie **zastępuje** poprzedni. W adapterze JPA `deleteByTakenAt` + `flush()` przed zapisem jest
-konieczne: bez flusha Hibernate wykonałby INSERT przed DELETE i wywalił się na unikalności.
+`taken_at` is always truncated to the full UTC hour and is `UNIQUE` — a repeated snapshot within
+the same hour **replaces** the previous one. In the JPA adapter, `deleteByTakenAt` + `flush()`
+before the write is necessary: without the flush Hibernate would run the INSERT before the DELETE
+and blow up on uniqueness.
 
 ### Configuration
 
-Prefix `portfolio`, klasa `config.PortfolioProperties`. Repo jest **publiczne**, więc adresy i klucz
-czytane są wyłącznie z zewnątrz, z pustą wartością domyślną — brak zmiennej to ostrzeżenie w logu,
-nigdy błąd startu.
+Prefix `portfolio`, class `config.PortfolioProperties`. The repo is **public**, so the addresses
+and the key are read exclusively from outside, with an empty default — a missing variable is a
+warning in the log, never a startup failure.
 
-| Zmienna | Rola |
+| Variable | Role |
 | --- | --- |
-| `CMC_API_KEY` | Klucz CoinMarketCap. Bez niego snapshot loguje błąd i nic nie zapisuje. |
-| `PORTFOLIO_RABBY_ADDRESS` | Adres EVM dla etykiety `Rabby` (ethereum, arbitrum). |
-| `PORTFOLIO_TREZOR_EVM_ADDRESS` | Adres EVM dla etykiety `Trezor` (bsc). |
-| `PORTFOLIO_TREZOR_BTC_XPUB` | Rozszerzony klucz publiczny BTC dla `Trezor` (zpub, BIP84). |
-| `PORTFOLIO_TREZOR_BCH_XPUB` | Klucz konta BCH (xpub, BIP44 — **inna ścieżka niż BTC**). Dziś nieaktywny, hosty Blockbooka zwracają 403. |
-| `PORTFOLIO_TREZOR_BCH_AMOUNT` | Ilość BCH wpisana ręcznie, póki odczyt z xpuba jest niemożliwy. Wyzeruj, włączając xpub. **Czytana tylko przy pierwszym starcie** — potem rządzi baza, patrz [Ilości wpisane ręcznie](#ilości-wpisane-ręcznie). |
-| `PORTFOLIO_TAO_STAKING_AMOUNT` | Ilość TAO w stakingu. **Nagrody narastają ciągle — odświeżaj**, ale przez `PUT`, nie przez tę zmienną. |
-| `PORTFOLIO_TRB_STAKING_AMOUNT` | Ilość TRB w stakingu. Jak wyżej. |
-| `COINBASE_KEY_NAME` | Nazwa klucza CDP: `organizations/{org}/apiKeys/{id}`. Sama w sobie nie jest sekretem. |
-| `COINBASE_PRIVATE_KEY` | Prywatny klucz EC (SEC1 PEM, `\n` dopuszczalne). **To jest sekret — klucz tylko do odczytu.** |
+| `CMC_API_KEY` | CoinMarketCap key. Without it a snapshot logs an error and stores nothing. |
+| `PORTFOLIO_RABBY_ADDRESS` | EVM address for the `Rabby` label (ethereum, arbitrum). |
+| `PORTFOLIO_TREZOR_EVM_ADDRESS` | EVM address for the `Trezor` label (bsc). |
+| `PORTFOLIO_TREZOR_BTC_XPUB` | BTC extended public key for `Trezor` (zpub, BIP84). |
+| `PORTFOLIO_TREZOR_BCH_XPUB` | BCH account key (xpub, BIP44 — **a different path than BTC**). Dormant today, Blockbook hosts return 403. |
+| `PORTFOLIO_TREZOR_BCH_AMOUNT` | BCH amount entered by hand, as long as reading it from the xpub is impossible. Zero it out when enabling the xpub. **Read only on the first startup** — the database rules afterwards, see [Manual amounts](#manual-amounts). |
+| `PORTFOLIO_TAO_STAKING_AMOUNT` | TAO amount in staking. **It grows for two reasons — refresh it**, but through `PUT`, not through this variable. |
+| `PORTFOLIO_TRB_STAKING_AMOUNT` | TRB amount in staking. As above. |
+| `COINBASE_KEY_NAME` | CDP key name: `organizations/{org}/apiKeys/{id}`. Not a secret in itself. |
+| `COINBASE_PRIVATE_KEY` | EC private key (SEC1 PEM, `\n` accepted). **This one is a secret — make it read-only.** |
+| `DB_USER`, `DB_PASSWORD` | As in the rest of the application. |
 
-Hyperliquid korzysta z `PORTFOLIO_RABBY_ADDRESS` — nie ma własnej zmiennej, choć w podziale na
-źródła występuje pod własną etykietą `Hyperliquid`.
-| `DB_USER`, `DB_PASSWORD` | Jak w pozostałej części aplikacji. |
+Hyperliquid uses `PORTFOLIO_RABBY_ADDRESS` — it has no variable of its own, even though it appears
+under its own `Hyperliquid` label in the source breakdown.
 
-`portfolio.carry-forward-max-age` (domyślnie `7d`) ogranicza, jak stare ilości wolno przenieść
-po awarii źródła — patrz [Przenoszenie ilości](#przenoszenie-ilości-gdy-źródło-padnie).
+`portfolio.carry-forward-max-age` (`7d` by default) bounds how old an amount may be and still be
+carried forward after a source fails — see
+[Carrying amounts forward](#carrying-amounts-forward-when-a-source-fails).
 
-Wartości podaje się **poza repo**, w `config/application-dev.yml` (albo `-prod`), który jest
-w `.gitignore`. Plik z katalogu `./config/` ma wyższy priorytet niż ten z `src/main/resources`:
+Values are supplied **outside the repo**, in `config/application-dev.yml` (or `-prod`), which is
+in `.gitignore`. A file in `./config/` takes precedence over the one in `src/main/resources`:
 
 ```yaml
-# config/application-prod.yml — nigdy nie wchodzi do gita
+# config/application-prod.yml — never goes into git
 DB_USER: "..."
 DB_PASSWORD: "..."
 CMC_API_KEY: "..."
@@ -272,343 +276,361 @@ PORTFOLIO_RABBY_ADDRESS: "0x..."
 PORTFOLIO_TREZOR_EVM_ADDRESS: "0x..."
 ```
 
-Nie nadpisuj tam `portfolio.evm.wallets` — listy YAML się nie scalają, tylko podmieniają, więc
-zniknęłyby pozostałe portfele. Definiuj tylko nazwy, których szukają placeholdery.
+Do not override `portfolio.evm.wallets` there — YAML lists do not merge, they replace, so the
+remaining wallets would disappear. Define only the names the placeholders look for.
 
-`portfolio.enabled` włącza **wyłącznie scheduler** (`config.PortfolioSchedulerConfig` wnosi
-`@EnableScheduling`). Ręczny `POST /api/portfolio/snapshots` działa niezależnie od flagi;
-w testach flaga jest wyłączona.
+`portfolio.enabled` turns on **the scheduler only** (`config.PortfolioSchedulerConfig` contributes
+`@EnableScheduling`). A manual `POST /api/portfolio/snapshots` works regardless of the flag; in
+tests the flag is off.
 
-Sieci i whitelista tokenów siedzą w `application-{profile}.yml`. Kontrakty i `decimals`
-zweryfikowane on-chain przez `symbol()`/`decimals()`, id przez CoinMarketCap:
+Networks and the token whitelist live in `application-{profile}.yml`. Contracts and `decimals`
+verified on-chain via `symbol()`/`decimals()`, ids via CoinMarketCap:
 
-| Sieć | Aktywa | cmcId |
+| Network | Assets | cmcId |
 | --- | --- | --- |
-| ethereum | ETH natywne, NPC `0x8eD97a63…08F6`, WOO `0x4691937a…5D4B` (oba 18 decimals) | 1027, 27960, 7501 |
-| arbitrum | ETH natywne | 1027 |
-| bsc | BNB natywne, ASTER `0x000Ae314…556A` (18 decimals) | 1839, 36341 |
-| bitcoin | BTC z xpuba przez Blockbook | 1 |
-| hyperliquid | spot, kapitał na perpach i staking; osobne źródło `Hyperliquid` | 3408, 34332, 32196, 1027, 1, 34466 |
-| coinbase | salda giełdowe przez CDP, whitelista z `min-amount` na pyłek | 3408, 3773, 13502, 1, 1027 |
-| bittensor, ethereum (staking) | `TAO staking`, `TRB staking` — ilości wpisywane ręcznie | 22974, 4944 |
+| ethereum | native ETH, NPC `0x8eD97a63…08F6`, WOO `0x4691937a…5D4B` (both 18 decimals) | 1027, 27960, 7501 |
+| arbitrum | native ETH | 1027 |
+| bsc | native BNB, ASTER `0x000Ae314…556A` (18 decimals) | 1839, 36341 |
+| bitcoin | BTC from an xpub via Blockbook | 1 |
+| hyperliquid | spot, perps equity and staking; separate `Hyperliquid` source | 3408, 34332, 32196, 1027, 1, 34466 |
+| coinbase | exchange balances via CDP, whitelist with `min-amount` against dust | 3408, 3773, 13502, 1, 1027 |
+| bittensor, ethereum (staking) | `TAO staking`, `TRB staking` — amounts entered by hand | 22974, 4944 |
 
-Dodanie tokenu EVM to **jedna linia YAML-a, bez kodu i bez redeploya schematu**. Procedura,
-której trzymaj się za każdym razem — adresu, `decimals` ani id nie zgaduj:
+Adding an EVM token is **one line of YAML, no code and no schema redeploy**. Follow this procedure
+every single time — do not guess the address, the `decimals` or the id:
 
-1. Znajdź adres kontraktu w dwóch niezależnych źródłach (eksplorator + lista platform w CMC).
-2. Potwierdź on-chain na docelowym RPC: `symbol()` = `0x95d89b41`, `decimals()` = `0x313ce567`.
-3. Sprawdź `balanceOf` (`0x70a08231` + adres dopełniony do 32 bajtów) na swoim adresie — jeśli
-   wychodzi zero, to albo nie ten kontrakt, albo nie ta sieć.
-4. Weź `cmc-id` z CoinMarketCapa i dopisz wpis do `tokens` danej sieci.
+1. Find the contract address in two independent sources (an explorer + the platform list in CMC).
+2. Confirm it on-chain against the target RPC: `symbol()` = `0x95d89b41`, `decimals()` = `0x313ce567`.
+3. Check `balanceOf` (`0x70a08231` + the address padded to 32 bytes) against your own address — if
+   it comes out zero, it is either the wrong contract or the wrong network.
+4. Take the `cmc-id` from CoinMarketCap and add the entry to that network's `tokens`.
 
-Przykład przejścia tej procedury dla ASTER-a na bsc: `symbol()` zwróciło `ASTER`,
-`decimals()` → 18, `balanceOf` → 354,56577328, CMC id 36341, platforma w CMC zgodna z BscScanem.
+This procedure applied to ASTER on bsc: `symbol()` returned `ASTER`, `decimals()` → 18,
+`balanceOf` → 354.56577328, CMC id 36341, the platform in CMC matching BscScan.
 
-#### Ilości wpisane ręcznie
+#### Manual amounts
 
-`portfolio.manual.holdings` to wpisy, których nie da się odczytać automatycznie. **Z konfiguracji
-pochodzi wyłącznie ilość** — wycena idzie normalną ścieżką przez CoinMarketCap, więc wartość
-i przeliczenie na PLN są spójne z resztą. Pozycja **nie** jest `stale` tylko dlatego, że jest
-ręczna (tak stanowi kontrakt), a źródło nie ma czego wywołać, więc nigdy nie zawodzi i nie psuje
-`complete`.
+`portfolio.manual.holdings` holds the entries that cannot be read automatically. **Only the amount
+comes from the configuration** — pricing goes down the normal CoinMarketCap path, so the value and
+the PLN conversion stay consistent with the rest. A position is **not** `stale` merely because it
+is manual (the contract says so), and the source has nothing to call, so it never fails and never
+breaks `complete`.
 
-Ilość jest daną o majątku, więc w śledzonym YAML-u stoi placeholder. Zero znaczy „nic tu teraz nie
-trzymam" — wpis zostaje zadeklarowany i wraca, gdy ilość urośnie. `source` decyduje, do którego
-kawałka portfela pozycja dołącza; `key` to stabilny identyfikator, pod którym adresuje ją
-`PUT /api/portfolio/manual-holdings/{key}`.
+An amount is wealth data, so the tracked YAML holds a placeholder. A zero means "I hold nothing
+here right now" — the entry stays declared and comes back once the amount grows. `source` decides
+which slice of the portfolio the position joins; `key` is the stable identifier under which
+`PUT /api/portfolio/manual-holdings/{key}` addresses it.
 
-**Konfiguracja jest rejestrem tego, JAKIE pozycje istnieją; aktualną ILOŚĆ trzyma baza**
-(tabela `manual_holding`). Wartość z YAML-a to tylko ziarno: `PortfolioConfig` wstawia ją przy
-pierwszym starcie (`@Bean(initMethod = "seedMissing")`) i od tej chwili zmienia ją wyłącznie `PUT`
-— **edycja YAML-a nie robi już nic**, co jest zaskakujące i warte zapamiętania. Bez tego podziału
-`PUT` nie przetrwałby restartu, a kontraktowe `updatedAt` nie miałoby skąd się wziąć.
+**The configuration is a registry of WHICH positions exist; the current AMOUNT lives in the
+database** (table `manual_holding`). The YAML value is only a seed: `PortfolioConfig` inserts it on
+the first startup (`@Bean(initMethod = "seedMissing")`) and from then on only `PUT` changes it —
+**editing the YAML no longer does anything**, which is surprising and worth remembering. Without
+that split a `PUT` would not survive a restart, and the contractual `updatedAt` would have nowhere
+to come from.
 
-Zasianie siedzi w `initMethod`, nie w `ApplicationRunner`, celowo: runner biegnie **po** otwarciu
-portu, więc pierwsze zapytanie zdążyło zobaczyć `updatedAt: null`, czego kontrakt nie dopuszcza.
+The seeding sits in `initMethod` rather than in an `ApplicationRunner`, deliberately: a runner runs
+**after** the port opens, so the first request managed to see `updatedAt: null`, which the contract
+does not allow.
 
-`ManualHoldingsSource` nie dostaje ilości w konstruktorze, tylko funkcję odczytu
-(`ManualHoldingService::amountFor`), wołaną przy każdym snapshocie. Dlatego zmiana ilości działa
-bez restartu i bez przebudowy `HoldingsSourceRegistry` — ale też dlatego widać ją **dopiero
-w następnym snapshocie**, nie natychmiast w `summary`.
+`ManualHoldingsSource` does not receive the amount in its constructor, but a read function
+(`ManualHoldingService::amountFor`), called on every snapshot. That is why changing an amount works
+without a restart and without rebuilding `HoldingsSourceRegistry` — but also why it shows up **only
+in the next snapshot**, not immediately in `summary`.
 
-Dziś tak wchodzą trzy pozycje: **BCH** (tymczasowo, bo hosty Blockbooka oddają 403) oraz
-**staking TAO i TRB**, których nie czyta żadne nasze API.
+Three positions come in this way today: **BCH** (temporarily, because Blockbook hosts return 403)
+and **TAO and TRB staking**, which none of our APIs reads.
 
-**Jedyna realna słabość: liczba jest prawdziwa tylko do momentu, w którym stan się zmieni.** Przy
-BCH to znaczy „dopóki nie ruszysz monet". Przy stakingu jest gorzej — **nagrody narastają ciągle**,
-więc wpis starzeje się sam, zawsze zaniżając portfel, i nic tego nie sygnalizuje: ani `stale`, ani
-`complete=false`. Odczyt z łańcucha lub API jest zawsze lepszy tam, gdzie jest możliwy.
+**The one real weakness: the number is true only up to the moment the state changes.** For BCH that
+means "until you move the coins". For staking it is worse, because the amount grows for **two**
+independent reasons: **rewards accrue continuously**, and on top of that come **top-ups — the owner
+buys regularly and sends to the staking wallet**. The entry therefore ages by itself, always
+understating the portfolio, and nothing signals it: neither `stale` nor `complete=false`. Reading
+from the chain or an API is always better wherever it is possible.
 
-**Uwaga na podwójne liczenie.** Pozycje agregują się po `(source, network, asset, cmcId)`, więc
-ręczny wpis BCH i źródło xpub pod tą samą etykietą zsumowałyby się po cichu.
-`HoldingsSourceRegistry` ostrzega o tym przy starcie (`TWO SOURCES COVER '…'`), ale ostrzeżenie nie
-zastępuje decyzji: włączając odczyt z xpuba, wyzeruj `PORTFOLIO_TREZOR_BCH_AMOUNT`.
+The practical consequence when updating these amounts: **the rate of growth tells you nothing**. A
+jump larger than the reward rate alone would produce — several times within a single day, even — is
+an ordinary top-up, not a mistake, and there is nothing to ask about. Only these are suspicious: a
+**smaller** value without explanation (unstaking?), an order-of-magnitude slip, or a comma instead
+of a decimal point (the API rejects it as `invalid_body`).
+
+**Watch out for double counting.** Positions aggregate by `(source, network, asset, cmcId)`, so a
+manual BCH entry and an xpub source under the same label would silently add up.
+`HoldingsSourceRegistry` warns about this at startup (`TWO SOURCES COVER '…'`), but the warning
+does not replace the decision: when enabling the xpub read, zero out
+`PORTFOLIO_TREZOR_BCH_AMOUNT`.
 
 #### Coinbase
 
-`portfolio.coinbase` czyta salda przez Advanced Trade API (`GET /api/v3/brokerage/accounts`).
-Uwierzytelnienie to **klucz CDP**: nazwa (`organizations/{org}/apiKeys/{id}`) plus prywatny klucz
-EC w PEM — dwie osobne wartości, obie z zewnątrz. Klucz powinien mieć uprawnienia **tylko do
-odczytu**; portfel nie potrzebuje niczego więcej.
+`portfolio.coinbase` reads balances through the Advanced Trade API
+(`GET /api/v3/brokerage/accounts`). Authentication is a **CDP key**: the name
+(`organizations/{org}/apiKeys/{id}`) plus an EC private key in PEM — two separate values, both
+from outside. The key should have **read-only** permissions; the portfolio needs nothing more.
 
-Token buduje `CoinbaseJwt` per zapytanie i trzy rzeczy łatwo w nim zrobić źle, bo każda kończy się
-nagim `401` bez wskazówki:
+`CoinbaseJwt` builds the token per request, and three things are easy to get wrong in it, because
+each one ends in a bare `401` with no hint:
 
-- **algorytm musi być ES256** (ECDSA P-256); klucze Ed25519 nie są akceptowane;
-- **`uri` to `{METHOD} {HOST}{PATH}`** — host bez schematu, ścieżka bez query stringa — a token
-  wiąże się z jednym takim zapytaniem i żyje 120 sekund;
-- **JCA podpisuje w DER, a JWS wymaga surowego `R||S`** po 32 bajty. Bez tej konwersji token jest
-  poprawnie zbudowany i nigdy się nie weryfikuje, a błąd w dopełnianiu ujawnia się **losowo** —
-  tylko gdy `r` albo `s` zaczyna się od bajtu ≥ 0x80. Dlatego konwersja ma test round-trip na obu
-  skrajach, a nie przykładowy wektor.
+- **the algorithm must be ES256** (ECDSA P-256); Ed25519 keys are not accepted;
+- **`uri` is `{METHOD} {HOST}{PATH}`** — the host without a scheme, the path without the query
+  string — and the token binds to that one request and lives for 120 seconds;
+- **JCA signs in DER, while JWS requires a raw `R||S`** of 32 bytes each. Without that conversion
+  the token is correctly built and never verifies, and a padding bug surfaces **at random** — only
+  when `r` or `s` starts with a byte ≥ 0x80. That is why the conversion has a round-trip test at
+  both extremes rather than one example vector.
 
-Coinbase daje klucz jako SEC1 PEM (`BEGIN EC PRIVATE KEY`), którego `KeyFactory` nie czyta — chce
-PKCS#8. Zamiast dodawać bibliotekę, 32-bajtowy skalar jest wyciągany z DER-a w `CoinbaseJwt`.
+Coinbase hands the key over as SEC1 PEM (`BEGIN EC PRIVATE KEY`), which `KeyFactory` does not read
+— it wants PKCS#8. Rather than adding a library, the 32-byte scalar is extracted from the DER in
+`CoinbaseJwt`.
 
-**Whitelista walut jest tu ważniejsza niż na łańcuchu.** Konto giełdowe zbiera pyłek z opłat
-i konwersji: w tym portfelu leżą `7E-7` BTC i `3.6E-9` ETH, razem kilka centów. Dlatego wpis
-whitelisty ma opcjonalne `min-amount`, które odcina pyłek bez wyrzucania waluty z konfiguracji.
+**The currency whitelist matters more here than on-chain.** An exchange account collects dust from
+fees and conversions: this portfolio holds `7E-7` BTC and `3.6E-9` ETH, a few cents in total. That
+is why a whitelist entry has an optional `min-amount`, which cuts off the dust without dropping the
+currency from the configuration.
 
 #### Hyperliquid
 
-`portfolio.hyperliquid` czyta kapitał z publicznego API `POST /info` (bez klucza, adres w ciele).
-Trzy osobne zapytania, bo żadne nie pokrywa całości: `clearinghouseState` (kapitał na perpach),
-`spotClearinghouseState` (salda spot), `delegatorSummary` (staking). Adres to ten sam
-`PORTFOLIO_RABBY_ADDRESS` — **żadnej nowej zmiennej środowiskowej**.
+`portfolio.hyperliquid` reads capital from the public `POST /info` API (no key, the address goes in
+the body). Three separate requests, because none of them covers the whole: `clearinghouseState`
+(perps equity), `spotClearinghouseState` (spot balances), `delegatorSummary` (staking). The address
+is the same `PORTFOLIO_RABBY_ADDRESS` — **no new environment variable**.
 
-Wszystkie trzy kubełki lądują na **jednej sieci** `hyperliquid`, rozdzielone po assecie. Tego
-`network` nie rozbijaj na trzy: decyzja użytkownika, a klucz agregacji to
-`(source, network, asset, cmcId)`, więc podział po sieciach nic nie wnosi, gdy assety i tak są różne.
+All three buckets land on **one network**, `hyperliquid`, separated by asset. Do not split that
+`network` into three: it is the user's decision, and the aggregation key is
+`(source, network, asset, cmcId)`, so splitting by network adds nothing when the assets differ anyway.
 
-Trzy rzeczy, których nie widać z kodu:
+Three things the code does not show:
 
-- **Tokeny owinięte przez Unit wyceniamy tym, czym są**, a Hyperliquid sam to podaje w
-  `fullName`: `UETH` to „Unit Ethereum" (ETH, 1027), `UBTC` to „Unit Bitcoin" (BTC, 1),
-  `HPENGU` to „Pudgy Penguins" (PENGU, 34466). Dodając token na whitelistę, sprawdź `fullName`
-  w `spotMetaAndAssetCtxs` — nie zgaduj po tickerze.
-- **`accountValue` to nie saldo tokena**, a kapitał własny w USD po niezrealizowanym PnL. Jest
-  raportowany jako ilość assetu `USD` wycenianego ceną USDC (~1), więc wychodzi osobnym wierszem
-  wartym dokładnie tyle dolarów, zamiast zlać się ze spotowym USDC. Ta pozycja jest najbardziej
-  zmienna w portfelu — konto jest na dźwigni (zaobserwowane 40× na BTC) i przy likwidacji może
-  pójść do zera.
-- **Whitelista spot jest obowiązkowa.** Hyperliquid zwraca salda także dla tokenów nigdy nie
-  tykanych (zerowe UBTC, USDE, USDT0, USDH). Zera są pomijane, a wszystko poza whitelistą
-  ignorowane — więc po nowym zakupie spot trzeba dopisać token, inaczej po cichu zniknie
-  z portfela.
+- **Tokens wrapped by Unit are priced as what they actually are**, and Hyperliquid states it itself
+  in `fullName`: `UETH` is "Unit Ethereum" (ETH, 1027), `UBTC` is "Unit Bitcoin" (BTC, 1),
+  `HPENGU` is "Pudgy Penguins" (PENGU, 34466). When adding a token to the whitelist, check
+  `fullName` in `spotMetaAndAssetCtxs` — do not guess from the ticker.
+- **`accountValue` is not a token balance**, but the account equity in USD after unrealized PnL. It
+  is reported as an amount of the `USD` asset priced with USDC (~1), so it comes out as a separate
+  row worth exactly that many dollars instead of blending into spot USDC. This position is the most
+  volatile one in the portfolio — the account is leveraged (40× observed on BTC) and a liquidation
+  can take it to zero.
+- **The spot whitelist is mandatory.** Hyperliquid also returns balances for tokens never touched
+  (zero UBTC, USDE, USDT0, USDH). Zeros are skipped and everything outside the whitelist is
+  ignored — so after a new spot purchase the token has to be added, otherwise it silently
+  disappears from the portfolio.
 
-Czego świadomie nie czytamy: depozytów w vaultach (`userVaultEquities`) i subkont
-(`subAccounts`) — sprawdzone dla tego portfela, zwracają `[]` i `null`. Gdy się pojawią, będzie
-trzeba dołożyć czwarty kubełek.
+What we deliberately do not read: vault deposits (`userVaultEquities`) and sub-accounts
+(`subAccounts`) — checked for this portfolio, they return `[]` and `null`. Once they show up, a
+fourth bucket will have to be added.
 
-Pułapka przy pracy z API, która kosztowała mnie błędną wycenę: w `spotMetaAndAssetCtxs`
-**`universe` i `ctxs` nie są wyrównane pozycyjnie** (330 vs 1003 wpisów). Łącz po `ctx.coin`
-równym `universe[].name`, nigdy przez `zip`. Nasz adapter tego endpointu nie używa — ceny bierze
-CoinMarketCap — ale notuję, bo to naturalny odruch przy diagnostyce.
+An API pitfall that cost me a wrong valuation: in `spotMetaAndAssetCtxs` **`universe` and `ctxs`
+are not positionally aligned** (330 vs 1003 entries). Join on `ctx.coin` equal to
+`universe[].name`, never by `zip`. Our adapter does not use that endpoint — prices come from
+CoinMarketCap — but I am noting it, because it is the natural reflex when diagnosing.
 
-#### Łańcuchy UTXO (xpub przez Blockbook)
+#### UTXO chains (xpub via Blockbook)
 
-`portfolio.blockbook` czyta salda z rozszerzonego klucza publicznego przez publiczny Blockbook
-Trezora (`GET /api/v2/xpub/{xpub}?details=basic`, saldo w satoshi). Blockbook sam wyprowadza
-adresy i stosuje gap limit, więc `zpub` (BIP84) wystarcza — po stronie aplikacji nie ma żadnej
-derywacji kluczy. Dodanie BCH to wpis sieci `bitcoin-cash` z `base-url: https://bch1.trezor.io`,
-`cmc-id: 1831`, `decimals: 8` plus wpis portfela z tą samą etykietą `Trezor`.
+`portfolio.blockbook` reads balances from an extended public key through Trezor's public Blockbook
+(`GET /api/v2/xpub/{xpub}?details=basic`, balance in satoshi). Blockbook derives the addresses
+itself and applies a gap limit, so a `zpub` (BIP84) is enough — there is no key derivation on the
+application side. Adding BCH means a `bitcoin-cash` network entry with
+`base-url: https://bch1.trezor.io`, `cmc-id: 1831`, `decimals: 8` plus a wallet entry under the
+same `Trezor` label.
 
-Dwie rzeczy, których nie widać z kodu:
+Two things the code does not show:
 
-- **`User-Agent` jest obowiązkowy.** Bez nagłówka serwer Trezora oddaje `403` ze stroną
-  Cloudflare, nie JSON-a. Dlatego `portfolio.blockbook.user-agent` jest konfigurowalny.
-- **Xpub jedzie w ścieżce URL-a**, a komunikaty `RestClient` cytują URL. `BlockbookClient`
-  dlatego nigdy nie przepuszcza wiadomości wyjątku źródłowego — składa własną, z nazwą sieci
-  i kodem HTTP. Xpub ujawnia całe saldo i historię portfela, więc nie może trafić do logu.
-  Jest na to test (`hasMessageNotContaining`).
+- **`User-Agent` is mandatory.** Without the header Trezor's server returns `403` with a Cloudflare
+  page, not JSON. That is why `portfolio.blockbook.user-agent` is configurable.
+- **The xpub travels in the URL path**, and `RestClient` messages quote the URL. That is why
+  `BlockbookClient` never lets the source exception's message through — it composes its own, with
+  the network name and the HTTP code. An xpub reveals the wallet's entire balance and history, so
+  it must not reach the log. There is a test for it (`hasMessageNotContaining`).
 
-Pojedynczy host to pojedynczy punkt awarii (`btc2.trezor.io` odpowiadał `503` w trakcie
-implementacji), ale nie ma tu failoveru świadomie: awaria Blockbooka to zwykła awaria źródła,
-więc ilość BTC przenosi się z poprzedniego snapshotu i pozycja dostaje `stale=true`.
+A single host is a single point of failure (`btc2.trezor.io` was answering `503` during
+implementation), but there is deliberately no failover here: a Blockbook outage is an ordinary
+source failure, so the BTC amount carries forward from the previous snapshot and the position gets
+`stale=true`.
 
-**BCH jest skonfigurowany, ale uśpiony i obecnie niedostępny.** Dwie niezależne przeszkody:
+**BCH is configured, but dormant and currently unreachable.** Two independent obstacles:
 
-- Brakuje `PORTFOLIO_TREZOR_BCH_XPUB`. BCH ma inną ścieżkę derywacji niż BTC, więc to **osobny
-  klucz z Trezor Suite** — nie ten sam `zpub`. Bez zmiennej wpis jest pomijany z ostrzeżeniem
-  `Wallet 'Trezor' has no xpub configured`, czyli nic się nie psuje.
-- Stan na 2026-10-05: **wszystkie hosty `bch1`–`bch5.trezor.io` oddają `403`** ze stroną
-  Cloudflare „Sorry, you have been blocked", na każdej ścieżce i niezależnie od `User-Agent`
-  (sprawdzone też z przeglądarkowym). Kontrola na `btc1.trezor.io/api/v2` w tym samym momencie:
-  `200`. Czyli to reguła firewalla po stronie Trezora dla hostów BCH, nie problem z naszym
-  zapytaniem i nie coś, co należy obchodzić.
+- `PORTFOLIO_TREZOR_BCH_XPUB` is missing. BCH has a different derivation path than BTC, so this is
+  **a separate key from Trezor Suite** — not the same `zpub`. Without the variable the entry is
+  skipped with a `Wallet 'Trezor' has no xpub configured` warning, so nothing breaks.
+- As of 2026-10-05: **every host from `bch1` to `bch5.trezor.io` returns `403`** with a Cloudflare
+  "Sorry, you have been blocked" page, on every path and regardless of `User-Agent` (checked with a
+  browser one too). A control request to `btc1.trezor.io/api/v2` at the same moment: `200`. So it
+  is a firewall rule on Trezor's side for the BCH hosts, not a problem with our request, and not
+  something to work around.
 
-Dopóki blokada trwa, ustawienie xpuba sprawi tylko, że źródło będzie zgłaszać awarię — czyli
-carry-forward i `stale=true`, a snapshot `complete=false`. Opcje, gdy BCH będzie potrzebny:
-poczekać (host wcześniej działał), wskazać `base-url` na inną instancję Blockbooka (ale xpub
-ujawnia cały portfel, więc to decyzja o zaufaniu), albo postawić własną instancję.
+As long as the block lasts, setting the xpub will only make the source report a failure — i.e.
+carry-forward and `stale=true`, with the snapshot `complete=false`. The options once BCH is needed:
+wait (the host worked before), point `base-url` at another Blockbook instance (but an xpub reveals
+the whole wallet, so that is a trust decision), or run your own instance.
 
 ### Database
 
-Prod chodzi z `ddl-auto: validate`, więc tabele muszą istnieć **przed** startem:
+Prod runs with `ddl-auto: validate`, so the tables have to exist **before** startup:
 
 ```bash
 psql -h localhost -U <user> -d postgres -f sql/portfolio_schema.sql
 ```
 
-Skrypt zakłada **trzy** tabele: `portfolio_snapshot`, `portfolio_position` i `manual_holding`.
-Jest zgodny z encjami co do kolumn, typów i skal (sprawdzone eksportem DDL Hibernate'a
-z dialektem Postgresa). Dev (H2, `create`) buduje je sam z encji.
+The script creates **three** tables: `portfolio_snapshot`, `portfolio_position` and
+`manual_holding`. It agrees with the entities on columns, types and scales (verified by exporting
+Hibernate's DDL with the Postgres dialect). Dev (H2, `create`) builds them from the entities itself.
 
-`manual_holding` doszła później niż pozostałe dwie, więc na maszynie, która wstała przed nią,
-`validate` wywali start — trzeba puścić skrypt ponownie (`CREATE TABLE` dla istniejących tabel
-zgłosi błąd, wtedy wykonaj samo `CREATE TABLE manual_holding` z końca pliku).
+`manual_holding` arrived later than the other two, so on a machine that came up before it,
+`validate` will fail the startup — the script has to be run again (`CREATE TABLE` for existing
+tables will raise an error, in which case run just the `CREATE TABLE manual_holding` from the end
+of the file).
 
-`portfolio_snapshot` trzyma **oba** totale (`total_usd`, `total_pln`), bo historia, zmiany i ATH
-liczą się osobno dla każdej waluty — szczyt w PLN może wypaść innego dnia niż w USD i nie da się
-go policzyć konwersją.
+`portfolio_snapshot` keeps **both** totals (`total_usd`, `total_pln`), because history, changes and
+the ATH are computed separately for each currency — the peak in PLN may fall on a different day
+than in USD and cannot be derived by conversion.
 
 ### API
 
-| Endpoint | Uwagi |
+| Endpoint | Notes |
 | --- | --- |
-| `GET /api/portfolio/summary?currency=USD\|PLN` | `204`, gdy nie ma żadnego snapshotu. `400` przy nieznanej walucie. |
-| `GET /api/portfolio/history?range=24H\|7D\|30D\|90D\|1Y\|ALL&currency=…` | `200` z pustą tablicą, gdy nie ma danych — nie `204`. `400` przy braku/nieznanym `range`. |
-| `POST /api/portfolio/snapshots` | Operatorski, poza kontraktem UI: zwraca snapshot jak zapisany, w obu walutach i z pełną precyzją. `503`, gdy nic nie zapisano. |
-| `GET /api/portfolio/manual-holdings` | Rejestr ręcznych pozycji: bez kwot i bez cen. Kolejność jak w konfiguracji. |
-| `PUT /api/portfolio/manual-holdings/{key}` | Zmienia **wyłącznie ilość**. `400` → `missing_amount`, `invalid_amount` (ujemna), `invalid_body` (tekst, `NaN`). `404` → `unknown_key`, z listą dostępnych kluczy w `message`. |
+| `GET /api/portfolio/summary?currency=USD\|PLN` | `204` when there is no snapshot at all. `400` for an unknown currency. |
+| `GET /api/portfolio/history?range=24H\|7D\|30D\|90D\|1Y\|ALL&currency=…` | `200` with an empty array when there is no data — not `204`. `400` for a missing/unknown `range`. |
+| `POST /api/portfolio/snapshots` | Operator-facing, outside the UI contract: returns the snapshot as stored, in both currencies and at full precision. `503` when nothing was stored. |
+| `GET /api/portfolio/manual-holdings` | Registry of manual positions: no values and no prices. Ordered as in the configuration. |
+| `PUT /api/portfolio/manual-holdings/{key}` | Changes **the amount only**. `400` → `missing_amount`, `invalid_amount` (negative), `invalid_body` (text, `NaN`). `404` → `unknown_key`, with the list of available keys in `message`. |
 
-Dolna granica okna historii jest **wyłączna**, górna włączna — inaczej 24-godzinne okno
-mieściłoby 25 punktów godzinowych zamiast udokumentowanych 24. Przy rozdzielczości 4h i 1d
-liczba punktów nadal może przekroczyć tabelkową o jeden (`30D` → 181), bo przedziały są
-wyrównane do granic UTC i okno dotyka brzegowego przedziału. Nie da się tego obciąć: ostatni
-punkt musi pozostać tym samym snapshotem co `summary`. Kontrakt nazywa te liczby orientacyjnymi,
-więc to zgodne ze spec — UI nie może zakładać stałej liczby punktów.
+The lower bound of the history window is **exclusive**, the upper one inclusive — otherwise a
+24-hour window would hold 25 hourly points instead of the documented 24. At 4h and 1d resolution
+the number of points can still exceed the one in the table by one (`30D` → 181), because the
+buckets are aligned to UTC boundaries and the window touches the edge bucket. There is no trimming
+it: the last point must remain the same snapshot as `summary`. The contract calls these numbers
+approximate, so this conforms to the spec — the UI must not assume a fixed number of points.
 
-Oba endpointy odczytowe są zakotwiczone w **najnowszym zapisanym snapshocie**, nie w zegarze.
-Dzięki temu ostatni punkt historii to zawsze ten sam snapshot, który opisuje `summary` — wymóg
-z sekcji „Spójność między endpointami" — nawet gdy zbieranie stanęło wiele godzin temu.
+Both read endpoints are anchored to **the newest stored snapshot**, not to the clock. That way the
+last history point is always the same snapshot that `summary` describes — the requirement from the
+"Consistency between endpoints" section — even when collection stopped many hours ago.
 
-Precyzja: kwoty 2 miejsca, `pct` 4 i w punktach procentowych, `amount` pełna precyzja.
-**Wyjątek: `price`** — 2 miejsca powyżej 1.00, a poniżej 6 cyfr znaczących. NPC kosztuje ~$0.022,
-więc dwa miejsca zrobiłyby z niego $0.02 i `value` przestałoby się zgadzać z `amount × price`;
-UI-owy `price()` i tak renderuje 4 miejsca poniżej dolara.
+Precision: amounts 2 places, `pct` 4 and in percentage points, `amount` full precision.
+**Exception: `price`** — 2 places above 1.00, and 6 significant digits below. NPC costs ~$0.022, so
+two places would turn it into $0.02 and `value` would stop matching `amount × price`; the UI's
+`price()` renders 4 places below a dollar anyway.
 
-Dwa niezmienniki, na których opiera się dashboard, zablokowane testami: `sources` jest puste
-**wtedy i tylko wtedy**, gdy puste jest `positions` (każda pozycja wnosi swoje źródło — UI
-rozpoznaje po tym pusty portfel), a `pct` przy `total = 0` wychodzi `0`, nigdy `null` ani `NaN`.
+Two invariants the dashboard relies on, pinned by tests: `sources` is empty **if and only if**
+`positions` is empty (every position contributes its source — that is how the UI recognizes an
+empty portfolio), and `pct` at `total = 0` comes out `0`, never `null` or `NaN`.
 
-`amount` z 18 miejscami po przecinku **nie przechodzi przez `double` bez straty** —
-`6390.281180127170627929` wczytuje się w JavaScripcie jako `6390.28118012717`. Do wyświetlania
-to bez znaczenia, ale gdyby kiedyś trzeba było pokazać dokładną ilość, liczba w JSON-ie tego nie
-uniesie i dopiero wtedy warto rozważyć stringa — kontrakt dziś wymaga liczb.
+An `amount` with 18 decimal places **does not survive a `double`** —
+`6390.281180127170627929` loads in JavaScript as `6390.28118012717`. For display that is
+irrelevant, but if the exact amount ever has to be shown, the number in the JSON will not carry it,
+and only then is a string worth considering — the contract requires numbers today.
 
-`server.error.include-stacktrace: never` w `application.yml` jest **celowe**: devtools podkręca tę
-wartość do `ALWAYS`, więc bez tego ciało `404` wyciekało stack trace. W paczce produkcyjnej
-devtools nie ma, ale bezpieczeństwo odpowiedzi nie powinno zależeć od classpathu.
+`server.error.include-stacktrace: never` in `application.yml` is **deliberate**: devtools turns
+that value up to `ALWAYS`, so without it the `404` body leaked a stack trace. The production
+package has no devtools, but response safety should not depend on the classpath.
 
-Schemat: `/v3/api-docs` (OpenAPI 3.1, zawsze włączony), Swagger UI tylko w dev pod
-`/swagger-ui.html`. `OpenApiConfig` zawiera customizer, który przepisuje nullowalne referencje na
-`anyOf: [ref, null]` — bez tego springdoc emituje `{"type":"null","$ref":…}` i generator
-TypeScriptu produkuje `ath: null` zamiast `Ath | null`.
+Schema: `/v3/api-docs` (OpenAPI 3.1, always on), Swagger UI only in dev at `/swagger-ui.html`.
+`OpenApiConfig` contains a customizer that rewrites nullable references into `anyOf: [ref, null]` —
+without it springdoc emits `{"type":"null","$ref":…}` and the TypeScript generator produces
+`ath: null` instead of `Ath | null`.
 
-Bez CORS: dashboard jedzie z tego samego originu. Uwierzytelnianie jest poza aplikacją
-(Cloudflare Access); webhooki TradingView muszą zostać otwarte, więc polityka nigdy nie obejmuje
-całej domeny.
+No CORS: the dashboard is served from the same origin. Authentication lives outside the application
+(Cloudflare Access); TradingView webhooks have to stay open, so the policy never covers the whole
+domain.
 
 ### Deployment
 
-Dwie subdomeny wskazują na **tę samą aplikację**, więc polityka dostępu musi to uwzględniać:
+Two subdomains point at **the same application**, so the access policy has to account for that:
 
-| Host | Co obsługuje | Dostęp |
+| Host | What it serves | Access |
 | --- | --- | --- |
-| `webhook.tradeengine.app` | wyłącznie `POST /webhooks/*` | otwarty — TradingView nie umie się uwierzytelnić |
-| `portfolio.tradeengine.app` | dashboard w korzeniu i `/api/portfolio/*` | Cloudflare Access na całym hoście |
+| `webhook.tradeengine.app` | `POST /webhooks/*` only | open — TradingView cannot authenticate |
+| `portfolio.tradeengine.app` | the dashboard at the root and `/api/portfolio/*` | Cloudflare Access on the whole host |
 
-**Port: prod chodzi na 8080**, bo `application-prod.yml` nie ustawia `server.port` i Spring bierze
-domyślny. Tylko dev ma jawne `8081`. Polecenia weryfikacyjne na maszynie celuj więc
-w `http://localhost:8080`.
+**Port: prod runs on 8080**, because `application-prod.yml` does not set `server.port` and Spring
+takes the default. Only dev has an explicit `8081`. So point verification commands on the machine
+at `http://localhost:8080`.
 
-**Host webhookowy proxuje do originu wszystkie ścieżki, nie tylko `/webhooks/*`.** Bez reguły
-brzegowej `https://webhook.tradeengine.app/api/portfolio/summary` oddaje całe portfolio publicznie.
-Dlatego w Cloudflare WAF stoi reguła *default-deny* dla tego hosta:
+**The webhook host proxies every path to the origin, not just `/webhooks/*`.** Without an edge rule,
+`https://webhook.tradeengine.app/api/portfolio/summary` serves the whole portfolio publicly. That is
+why a *default-deny* rule for this host sits in Cloudflare WAF:
 
 ```
 (http.host eq "webhook.tradeengine.app" and not starts_with(http.request.uri.path, "/webhooks/"))
 ```
-→ Block. Zamyka też `/portfolio*`, `/v3/api-docs`, `/api/signals/*` i cokolwiek dojdzie później.
-Access na drugim hoście tego nie załatwia — polityki działają per host.
+→ Block. It also closes `/portfolio*`, `/v3/api-docs`, `/api/signals/*` and whatever comes later.
+Access on the other host does not take care of this — policies work per host.
 
-Przed pierwszym startem na prodzie: reguła WAF, potem `sql/portfolio_schema.sql` (**trzy** tabele
-— jeśli baza wstała przed dodaniem `manual_holding`, puść samo `CREATE TABLE manual_holding`), potem
-`config/application-prod.yml` **w katalogu roboczym procesu** (`./config/` jest rozwiązywane
-względem cwd, nie względem jara), potem build dashboardu w katalogu wskazanym przez
-`PORTFOLIO_UI_DIR`.
+Before the first startup on prod: the WAF rule, then `sql/portfolio_schema.sql` (**three** tables —
+if the database came up before `manual_holding` was added, run just `CREATE TABLE manual_holding`),
+then `config/application-prod.yml` **in the process's working directory** (`./config/` is resolved
+against the cwd, not against the jar), then the dashboard build in the directory
+`PORTFOLIO_UI_DIR` points at.
 
-**Maszyna produkcyjna chodzi na Windows**, co unieważnia kilka odruchów: nie ma `sudo`, peer auth
-ani `systemd`, więc do Postgresa wchodzi się hasłem (`psql.exe` z `C:\Program Files\PostgreSQL\{wersja}\bin`,
-zwykle poza `PATH`), a katalog roboczy ustawia bat-ka, „Start in" w Task Schedulerze albo
-`AppDirectory` w NSSM — nie `WorkingDirectory` z unitu.
+**The production machine runs Windows**, which invalidates a few reflexes: there is no `sudo`, no
+peer auth and no `systemd`, so Postgres is entered with a password (`psql.exe` from
+`C:\Program Files\PostgreSQL\{version}\bin`, usually outside `PATH`), and the working directory is
+set by a .bat file, by "Start in" in Task Scheduler or by `AppDirectory` in NSSM — not by a unit's
+`WorkingDirectory`.
 
-Ścieżka do dashboardu **musi** wtedy przyjść z `PORTFOLIO_UI_DIR` (np.
-`file:C:/tradeengine/portfolio/`). Domyślne `file:/opt/tradeengine/portfolio/` rozwinie się na
-Windows do nieistniejącego `\opt\tradeengine\portfolio\`: start przejdzie, API będzie działać,
-a `GET /` odda 404 — awaria cicha, więc sprawdzaj ją jawnie po deployu.
+The dashboard path **must** then come from `PORTFOLIO_UI_DIR` (e.g.
+`file:C:/tradeengine/portfolio/`). The default `file:/opt/tradeengine/portfolio/` expands on
+Windows to a non-existent `\opt\tradeengine\portfolio\`: startup passes, the API works, and `GET /`
+returns 404 — a silent failure, so check it explicitly after a deploy.
 
-Konsekwencja Access na całym hoście: po wygaśnięciu sesji Cloudflare odpowiada na `fetch`
-przekierowaniem na stronę logowania, czyli HTML-em ze statusem 200. Front rozpoznaje to po
-`redirect: 'manual'` i `response.type === 'opaqueredirect'`, co jest jednoznaczne, bo **API nigdy
-nie odpowiada 3xx** — sprawdzone dla wszystkich ścieżek, również dla ukośnika końcowego. Dodanie
-przekierowania pod `/api` złamałoby to rozpoznanie.
+A consequence of Access on the whole host: once the session expires, Cloudflare answers a `fetch`
+with a redirect to the login page, i.e. HTML with status 200. The front end recognizes this by
+`redirect: 'manual'` and `response.type === 'opaqueredirect'`, which is unambiguous because **the
+API never answers 3xx** — checked for every path, including a trailing slash. Adding a redirect
+under `/api` would break that detection.
 
 ### UI
 
-Backend **nie wozi własnego UI**. Dashboard to osobne repo (`tradeengine-dashboard`, Vite +
-React), budowane z `base: '/'` i wgrywane do katalogu na maszynie produkcyjnej. Spring serwuje
-ten katalog spoza jara:
+The backend **does not carry its own UI**. The dashboard is a separate repo
+(`tradeengine-dashboard`, Vite + React), built with `base: '/'` and uploaded to a directory on the
+production machine. Spring serves that directory from outside the jar:
 
 ```yaml
 spring.web.resources.static-locations: ${PORTFOLIO_UI_DIR:file:/opt/tradeengine/portfolio/},classpath:/static/
 ```
 
-`PORTFOLIO_UI_DIR` podaje się w `config/application-prod.yml`, bo ścieżka zależy od systemu
-maszyny — patrz [Deployment](#deployment).
+`PORTFOLIO_UI_DIR` is supplied in `config/application-prod.yml`, because the path depends on the
+machine's operating system — see [Deployment](#deployment).
 
-Wydanie frontu nie wymusza wtedy redeploya backendu, a origin pozostaje jeden — bez CORS-u i bez
-drugiej polityki Access. `static-locations` **nadpisuje** domyślne, więc `classpath:/static/`
-musi zostać wpisane jawnie. `index.html` ląduje w korzeniu (`GET /`), bundle pod `/assets/`,
-a nagłówki cache rozdziela `config.StaticResourceConfig` (powód w jego javadocu).
-**Nie dodawaj mapowania na `/`** — zasłoniłoby welcome page i `/` oddawałoby redirect zamiast
-dashboardu; dokładnie tak było, gdy istniał `PortfolioPageController`.
+Releasing the front end then does not force a backend redeploy, and the origin stays single — no
+CORS and no second Access policy. `static-locations` **overrides** the defaults, so
+`classpath:/static/` has to be listed explicitly. `index.html` lands at the root (`GET /`), the
+bundle under `/assets/`, and `config.StaticResourceConfig` splits the cache headers (the reason is
+in its javadoc). **Do not add a mapping for `/`** — it would shadow the welcome page and `/` would
+return a redirect instead of the dashboard; that is exactly what happened while
+`PortfolioPageController` existed.
 
-**Brak fallbacku SPA**: dashboard to jeden widok bez routera, więc `/**` nie forwarduje na
-`index.html`. Gdy router dojdzie, trzeba to dodać — objawi się jako 404 przy odświeżeniu
-podstrony.
+**No SPA fallback**: the dashboard is a single view with no router, so `/**` does not forward to
+`index.html`. Once a router arrives, this will have to be added — it will show up as a 404 when a
+subpage is refreshed.
 
-Po błędzie API front **nigdy** nie podstawia danych demo — tryb mock włącza wyłącznie jawna
-flaga budowania. Ciche podsunięcie fikcyjnych liczb przy decyzjach finansowych jest gorsze niż
-komunikat o awarii.
+After an API error the front end **never** substitutes demo data — mock mode is enabled only by an
+explicit build flag. Quietly slipping in fictional numbers where financial decisions are made is
+worse than an error message.
 
-### Poza zakresem
+### Out of scope
 
-Świadomie niezaimplementowane, żeby nikt nie szukał tego w kodzie:
+Deliberately not implemented, so that nobody goes looking for it in the code:
 
-| Czego nie ma | Uwagi |
+| What is missing | Notes |
 | --- | --- |
-| Formularz ręcznych pozycji w UI | Backend ma `GET` i `PUT /api/portfolio/manual-holdings`; dashboard ich nie pokazuje. Ilości zmienia się curlem, patrz [API](#api). |
-| Dodawanie i usuwanie ręcznych pozycji przez API | Świadomie: `PUT` zmienia tylko ilość. Nowa pozycja to wpis w `portfolio.manual.holdings` i restart. |
-| BCH przez xpub | Infrastruktura gotowa: dodaj sieć `bitcoin-cash` (`base-url: https://bch1.trezor.io`, `cmc-id: 1831`, `decimals: 8`) i wpis portfela z etykietą `Trezor`. |
-| BTC poza xpubem (np. drugi portfel) | Jak wyżej, kolejny wpis w `portfolio.blockbook.wallets`. |
-| `fxRate` w odpowiedzi | Decyzja 2 kontraktu — kurs świadomie nie wychodzi na JSON. |
-| Uwierzytelnianie w aplikacji | Cloudflare Access, patrz [Deployment](#deployment). |
-| Failover między serwerami Blockbooka | Awaria to zwykła awaria źródła: carry-forward i `stale=true`. |
+| A UI form for manual positions | The backend has `GET` and `PUT /api/portfolio/manual-holdings`; the dashboard does not show them. Amounts are changed with curl, see [API](#api). |
+| Adding and removing manual positions through the API | Deliberate: `PUT` changes the amount only. A new position means an entry in `portfolio.manual.holdings` and a restart. |
+| BCH via xpub | The infrastructure is ready: add the `bitcoin-cash` network (`base-url: https://bch1.trezor.io`, `cmc-id: 1831`, `decimals: 8`) and a wallet entry with the `Trezor` label. |
+| BTC outside the xpub (e.g. a second wallet) | As above, another entry in `portfolio.blockbook.wallets`. |
+| `fxRate` in the response | Contract decision 2 — the rate deliberately does not reach the JSON. |
+| Authentication inside the application | Cloudflare Access, see [Deployment](#deployment). |
+| Failover between Blockbook servers | An outage is an ordinary source failure: carry-forward and `stale=true`. |
 
 ### Testing
 
-- `PortfolioMetricsTest` — zaokrąglenia i próbkowanie historii, bez Springa
-- `PortfolioQueryServiceTest` — `change`/ATH/historia na `InMemoryPortfolioSnapshotRepository`,
-  w tym test spójności `summary` z ostatnim punktem historii po wszystkich zakresach i walutach
-- `PortfolioSnapshotServiceTest` — carry-forward, fallback ceny, brak cen, zastąpienie godziny
+- `PortfolioMetricsTest` — rounding and history sampling, without Spring
+- `PortfolioQueryServiceTest` — `change`/ATH/history on `InMemoryPortfolioSnapshotRepository`,
+  including a test that `summary` agrees with the last history point across every range and currency
+- `PortfolioSnapshotServiceTest` — carry-forward, price fallback, missing prices, replacing an hour
 - `EvmBalanceClientTest`, `CoinMarketCapPriceProviderTest`, `BlockbookClientTest` —
-  `MockRestServiceServer`; w testach używaj sztucznego xpuba, nigdy prawdziwego
-- `HoldingsSourceRegistryTest` — m.in. etykieta rozpięta między EVM i xpubem
-- `PortfolioSnapshotPersistenceAdapterTest` — `@DataJpaTest`, bo JPQL i zastępowanie snapshotu
-  nie dają się sprawdzić na fake'u
-- `PortfolioControllerTest` — `@WebMvcTest` z prawdziwym serwisem nad fake'em repozytorium
+  `MockRestServiceServer`; in tests use a fake xpub, never a real one
+- `HoldingsSourceRegistryTest` — including a label spanning EVM and an xpub
+- `PortfolioSnapshotPersistenceAdapterTest` — `@DataJpaTest`, because JPQL and snapshot replacement
+  cannot be checked against a fake
+- `PortfolioControllerTest` — `@WebMvcTest` with the real service over a repository fake
 
 ## Source layout
 
