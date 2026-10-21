@@ -248,7 +248,7 @@ nigdy błąd startu.
 | `PORTFOLIO_TREZOR_BTC_XPUB` | Rozszerzony klucz publiczny BTC dla `Trezor` (zpub, BIP84). |
 | `PORTFOLIO_TREZOR_BCH_XPUB` | Klucz konta BCH (xpub, BIP44 — **inna ścieżka niż BTC**). Dziś nieaktywny, hosty Blockbooka zwracają 403. |
 | `PORTFOLIO_TREZOR_BCH_AMOUNT` | Ilość BCH wpisana ręcznie, póki odczyt z xpuba jest niemożliwy. Wyzeruj, włączając xpub. **Czytana tylko przy pierwszym starcie** — potem rządzi baza, patrz [Ilości wpisane ręcznie](#ilości-wpisane-ręcznie). |
-| `PORTFOLIO_TAO_STAKING_AMOUNT` | Ilość TAO w stakingu. **Nagrody narastają ciągle — odświeżaj**, ale przez `PUT`, nie przez tę zmienną. |
+| `PORTFOLIO_TAO_STAKING_AMOUNT` | Ilość TAO w stakingu. **Rośnie z dwóch powodów — odświeżaj**, ale przez `PUT`, nie przez tę zmienną. |
 | `PORTFOLIO_TRB_STAKING_AMOUNT` | Ilość TRB w stakingu. Jak wyżej. |
 | `COINBASE_KEY_NAME` | Nazwa klucza CDP: `organizations/{org}/apiKeys/{id}`. Sama w sobie nie jest sekretem. |
 | `COINBASE_PRIVATE_KEY` | Prywatny klucz EC (SEC1 PEM, `\n` dopuszczalne). **To jest sekret — klucz tylko do odczytu.** |
@@ -335,9 +335,17 @@ Dziś tak wchodzą trzy pozycje: **BCH** (tymczasowo, bo hosty Blockbooka oddaj�
 **staking TAO i TRB**, których nie czyta żadne nasze API.
 
 **Jedyna realna słabość: liczba jest prawdziwa tylko do momentu, w którym stan się zmieni.** Przy
-BCH to znaczy „dopóki nie ruszysz monet". Przy stakingu jest gorzej — **nagrody narastają ciągle**,
-więc wpis starzeje się sam, zawsze zaniżając portfel, i nic tego nie sygnalizuje: ani `stale`, ani
-`complete=false`. Odczyt z łańcucha lub API jest zawsze lepszy tam, gdzie jest możliwy.
+BCH to znaczy „dopóki nie ruszysz monet". Przy stakingu jest gorzej, bo ilość rośnie z **dwóch**
+niezależnych powodów: **nagrody narastają ciągle**, a do tego dochodzą **dopłaty — właściciel
+regularnie dokupuje i dosyła na portfel stakingowy**. Wpis starzeje się więc sam, zawsze zaniżając
+portfel, i nic tego nie sygnalizuje: ani `stale`, ani `complete=false`. Odczyt z łańcucha lub API
+jest zawsze lepszy tam, gdzie jest możliwy.
+
+Praktyczny wniosek przy aktualizowaniu tych ilości: **z tempa przyrostu nie wynika nic**. Skok
+większy, niż dałaby sama stopa nagród — także kilka razy w ciągu jednego dnia — to normalna
+dopłata, nie pomyłka, i nie ma o co pytać. Podejrzana jest tylko wartość **mniejsza** bez
+wyjaśnienia (unstaking?), pomyłka o rząd wielkości albo przecinek zamiast kropki (API odrzuca
+jako `invalid_body`).
 
 **Uwaga na podwójne liczenie.** Pozycje agregują się po `(source, network, asset, cmcId)`, więc
 ręczny wpis BCH i źródło xpub pod tą samą etykietą zsumowałyby się po cichu.
