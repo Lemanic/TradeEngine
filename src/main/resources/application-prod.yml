@@ -8,6 +8,20 @@ spring:
     hibernate:
       ddl-auto: validate
     show-sql: false
+  web:
+    resources:
+      # Dashboard jest wgrywany niezależnie od jara, do katalogu na maszynie. Dzięki temu
+      # wydanie frontu nie wymusza redeploya backendu, a origin pozostaje jeden.
+      # static-locations NADPISUJE domyślne, więc classpath:/static/ musi zostać jawnie.
+      # Katalog podaje PORTFOLIO_UI_DIR, bo ścieżka zależy od systemu maszyny: na Windows
+      # "file:/opt/..." rozwija się do nieistniejącego \opt\... i GET / oddaje 404,
+      # nie wywalając startu — czyli awaria cicha, łatwa do przeoczenia.
+      static-locations: ${PORTFOLIO_UI_DIR:file:/opt/tradeengine/portfolio/},classpath:/static/
+      cache:
+        cachecontrol:
+          # index.html nigdy nie może być cache'owany — hashowane bundle z /assets/
+          # dostają max-age roczny w StaticResourceConfig.
+          no-store: true
 app:
   strategies:
     - name: DOUBLE_DIVERGENCE_STRATEGY
@@ -23,8 +37,151 @@ app:
       enabled: true
       timeframes: [ H4 ]
     - name: FVG_LTF_CONFIRMATION
-      enabled: true
+      enabled: false
       timeframes: [ M1, M3, M5, M15, H1, H4 ]
   telegram:
     bot-token: ${TELEGRAM_BOT_TOKEN}
     chat-id: ${TELEGRAM_CHAT_ID}
+portfolio:
+  enabled: true
+  # Hourly, on the hour, in UTC. taken_at is truncated to the same hour.
+  cron: "0 0 * * * *"
+  cmc:
+    # Public repo: the key only ever comes from the environment.
+    api-key: ${CMC_API_KEY:}
+    base-url: https://pro-api.coinmarketcap.com
+    connect-timeout: 5s
+    read-timeout: 15s
+  # Ilości wpisywane ręcznie — dla tego, czego nie da się odczytać automatycznie.
+  # Z konfiguracji pochodzi WYŁĄCZNIE ilość; wycena idzie normalnie przez CoinMarketCap.
+  # Kwoty to dane o majątku, więc tu stoi placeholder, a wartość podajesz z zewnątrz.
+  manual:
+    holdings:
+      # BCH na Trezorze. Tymczasowo ręcznie, bo hosty bch*.trezor.io oddają 403 —
+      # po ich odblokowaniu przełącz się na odczyt z xpuba i wyzeruj tę ilość.
+      - key: trezor-bch
+        source: "Trezor"
+        network: bitcoin-cash
+        asset: BCH
+        cmc-id: 1831
+        amount: ${PORTFOLIO_TREZOR_BCH_AMOUNT:0}
+      # Staking TAO na jednym coldkeyu. Ilość wpisywana ręcznie — świadoma decyzja:
+      # odczyt z API taostats wymagałby klucza, a pozycje alpha pomijamy całkowicie.
+      # UWAGA: nagrody narastają ciągle, więc tę liczbę trzeba odświeżać; nic nie
+      # zasygnalizuje, że się rozjechała.
+      - key: tao-staking
+        source: "TAO staking"
+        network: bittensor
+        asset: TAO
+        cmc-id: 22974
+        amount: ${PORTFOLIO_TAO_STAKING_AMOUNT:0}
+      # Staking TRB (Tellor) na Ethereum. Ilość wpisywana ręcznie, jak TAO.
+      # Nagrody narastają, więc tę liczbę trzeba odświeżać — nic nie zasygnalizuje dryfu.
+      - key: trb-staking
+        source: "TRB staking"
+        network: ethereum
+        asset: TRB
+        cmc-id: 4944
+        amount: ${PORTFOLIO_TRB_STAKING_AMOUNT:0}
+  # Salda na Coinbase przez Advanced Trade API. Klucz CDP: nazwa + prywatny klucz EC (ES256).
+  # Klucz daje dostęp do konta, więc trzymaj go poza repo i nadaj mu uprawnienia TYLKO DO ODCZYTU.
+  coinbase:
+    base-url: https://api.coinbase.com
+    connect-timeout: 5s
+    read-timeout: 20s
+    key-name: ${COINBASE_KEY_NAME:}
+    private-key: ${COINBASE_PRIVATE_KEY:}
+    label: "Coinbase"
+    network: coinbase
+    # Whitelista. Konto giełdowe zbiera pyłek z opłat i konwersji — min-amount go odcina.
+    currencies:
+      - { code: USDC, asset: USDC, cmc-id: 3408 }
+      - { code: FET,  asset: FET,  cmc-id: 3773 }
+      - { code: WLD,  asset: WLD,  cmc-id: 13502 }
+      - { code: BTC,  asset: BTC,  cmc-id: 1,    min-amount: 0.0001 }
+      - { code: ETH,  asset: ETH,  cmc-id: 1027, min-amount: 0.001 }
+      # TAO kupowane na Coinbase. Osobna pozycja od źródła "TAO staking": klucz agregacji to
+      # (source, network, asset, cmcId), a source się różni — więc nie ma podwójnego liczenia.
+      - { code: TAO,  asset: TAO,  cmc-id: 22974 }
+      - { code: ORCA, asset: ORCA, cmc-id: 11165 }
+  hyperliquid:
+    base-url: https://api.hyperliquid.xyz
+    connect-timeout: 5s
+    read-timeout: 15s
+    # Spot, kapitał na perpach i staking lądują na jednej sieci, rozdzielone po assecie.
+    network: hyperliquid
+    # Osobna etykieta, nie "Rabby": kapitał na Hyperliquid jest wprawdzie dostępny tym samym
+    # adresem, ale w donucie i w podziale na źródła ma być widoczny jako osobny kawałek.
+    wallets:
+      - label: "Hyperliquid"
+        address: ${PORTFOLIO_RABBY_ADDRESS:}
+    # Whitelista spot. Tokeny owinięte przez Unit wyceniamy tym, czym faktycznie są —
+    # Hyperliquid podaje to w fullName: UETH to "Unit Ethereum", HPENGU to "Pudgy Penguins".
+    spot-tokens:
+      - { coin: USDC,   asset: USDC, cmc-id: 3408 }
+      - { coin: PURR,   asset: PURR, cmc-id: 34332 }
+      - { coin: HYPE,   asset: HYPE, cmc-id: 32196 }
+      - { coin: UETH,   asset: ETH,  cmc-id: 1027 }
+      - { coin: UBTC,   asset: BTC,  cmc-id: 1 }
+      - { coin: HPENGU, asset: PENGU, cmc-id: 34466 }
+    # accountValue to kapitał własny w USD po niezrealizowanym PnL, nie saldo tokena —
+    # wyrażamy go jako dolary, wyceniane ceną USDC (~1), w osobnym wierszu.
+    perps: { asset: USD, cmc-id: 3408 }
+    staking: { asset: HYPE, cmc-id: 32196 }
+  blockbook:
+    connect-timeout: 5s
+    read-timeout: 20s
+    # Serwery Trezora siedzą za filtrem botów i bez User-Agenta oddają 403.
+    user-agent: tradeengine/1.0
+    networks:
+      bitcoin:
+        base-url: https://btc1.trezor.io
+        asset: BTC
+        cmc-id: 1
+        decimals: 8
+      bitcoin-cash:
+        # UWAGA: 2026-10-05 wszystkie hosty bch1–bch5.trezor.io oddają 403 ("Sorry, you have
+        # been blocked" od Cloudflare) niezależnie od User-Agenta, podczas gdy btc1 działa.
+        # Wpis jest gotowy, ale póki blokada trwa, źródło będzie zgłaszać awarię — czyli
+        # carry-forward i stale=true. Patrz CLAUDE.md, sekcja o łańcuchach UTXO.
+        base-url: https://bch1.trezor.io
+        asset: BCH
+        cmc-id: 1831
+        decimals: 8
+    # Blockbook sam wylicza adresy z xpuba i stosuje gap limit, więc zpub (BIP84) wystarcza.
+    wallets:
+      - label: "Trezor"
+        xpub: ${PORTFOLIO_TREZOR_BTC_XPUB:}
+        network: bitcoin
+      # BCH ma inną ścieżkę derywacji niż BTC — to osobny xpub z Trezor Suite, nie ten sam zpub.
+      - label: "Trezor"
+        xpub: ${PORTFOLIO_TREZOR_BCH_XPUB:}
+        network: bitcoin-cash
+  evm:
+    connect-timeout: 5s
+    read-timeout: 15s
+    networks:
+      ethereum:
+        rpc-url: https://ethereum-rpc.publicnode.com
+        native-asset: { asset: ETH, cmc-id: 1027 }
+        # Whitelist only. Contracts and decimals verified on-chain via symbol()/decimals().
+        tokens:
+          - { asset: NPC, contract: "0x8eD97a637A790Be1feff5e888d43629dc05408F6", decimals: 18, cmc-id: 27960 }
+          - { asset: WOO, contract: "0x4691937a7508860F876c9c0a2a617E7d9E945D4B", decimals: 18, cmc-id: 7501 }
+      arbitrum:
+        rpc-url: https://arb1.arbitrum.io/rpc
+        native-asset: { asset: ETH, cmc-id: 1027 }
+        tokens: []
+      bsc:
+        rpc-url: https://bsc-dataseed.bnbchain.org
+        native-asset: { asset: BNB, cmc-id: 1839 }
+        tokens:
+          - { asset: ASTER, contract: "0x000Ae314E2A2172a039B26378814C252734f556A", decimals: 18, cmc-id: 36341 }
+    # Entries sharing a label are summed into one source.
+    wallets:
+      - label: "Rabby"
+        address: ${PORTFOLIO_RABBY_ADDRESS:}
+        networks: [ ethereum, arbitrum ]
+      - label: "Trezor"
+        address: ${PORTFOLIO_TREZOR_EVM_ADDRESS:}
+        networks: [ bsc ]

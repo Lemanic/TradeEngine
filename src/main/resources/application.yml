@@ -3,6 +3,23 @@ spring:
     version: "1.1.1"
   profiles:
     active: dev
+  jackson:
+    generator:
+      # amounts keep full precision, so they must never come out as 2.41E+0
+      write-bigdecimal-as-plain: true
+server:
+  error:
+    # spring-boot-devtools podkręca to do ALWAYS, więc bez jawnego ustawienia ciało 404
+    # wyciekało stack trace. W paczce produkcyjnej devtools nie ma, ale nie chcę, żeby
+    # bezpieczeństwo odpowiedzi zależało od tego, co jest na classpath.
+    include-stacktrace: never
+    include-message: never
+springdoc:
+  api-docs:
+    enabled: true
+  # Swagger UI tylko w dev — nadpisane w application-dev.yml
+  swagger-ui:
+    enabled: false
 logging:
   level:
     root: INFO
