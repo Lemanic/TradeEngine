@@ -26,20 +26,35 @@ public class TradingViewWebhookController {
 
     @PostMapping("/fvg")
     public ResponseEntity<Void> fvg(@RequestBody FvgAlertDto dto) {
-        webhookProcessingService.handleFvg(dto);
-        return ResponseEntity.accepted().build();
+        try {
+            webhookProcessingService.handleFvg(dto);
+            return ResponseEntity.accepted().build();
+        } catch (Exception e) {
+            log.error("Error processing FVG alert {}: {}", dto, e.getMessage(), e);
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @PostMapping("/divergence")
     public ResponseEntity<Void> divergence(@RequestBody DivergenceAlertDto dto) {
-        webhookProcessingService.handleDivergence(dto);
-        return ResponseEntity.accepted().build();
+        try {
+            webhookProcessingService.handleDivergence(dto);
+            return ResponseEntity.accepted().build();
+        } catch (Exception e) {
+            log.error("Error processing divergence alert {}: {}", dto, e.getMessage(), e);
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @PostMapping("/price")
     public ResponseEntity<Void> price(@RequestBody PriceUpdateDto dto) {
-        webhookProcessingService.handlePriceUpdate(dto);
-        return ResponseEntity.accepted().build();
+        try {
+            webhookProcessingService.handlePriceUpdate(dto);
+            return ResponseEntity.accepted().build();
+        } catch (Exception e) {
+            log.error("Error processing price update {}: {}", dto, e.getMessage(), e);
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @PostMapping("/momentum")
@@ -49,7 +64,7 @@ public class TradingViewWebhookController {
             webhookProcessingService.handleMomentumAlert(dto);
             return ResponseEntity.accepted().build();
         } catch (Exception e) {
-            log.error("Error processing momentum alert: {}", e.getMessage(), e);
+            log.error("Error processing momentum alert {}: {}", dto, e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
