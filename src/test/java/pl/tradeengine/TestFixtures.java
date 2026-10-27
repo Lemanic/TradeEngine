@@ -13,11 +13,13 @@ import pl.tradeengine.domain.model.DivergenceSignal;
 import pl.tradeengine.domain.model.FvgKind;
 import pl.tradeengine.domain.model.FvgStatus;
 import pl.tradeengine.domain.model.FvgZone;
+import pl.tradeengine.domain.model.fill.TradeFill;
 import pl.tradeengine.domain.model.Symbol;
 import pl.tradeengine.domain.model.Timeframe;
 import pl.tradeengine.domain.port.FvgRepository;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.List;
@@ -134,6 +136,20 @@ public final class TestFixtures {
                 BTC, Direction.LONG, scenarioName, Timeframe.H1,
                 new BigDecimal("60500"), Optional.empty(), Optional.empty(),
                 "TEST ALERT | " + scenarioName, FIXED_NOW);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Fille z gieldy
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * Fill na perpie z wypelnionymi polami — do testow, ktore patrza tylko na tid i czas.
+     * Testy tresci wiadomosci skladaja rekord wprost, bo tam liczy sie kazde pole.
+     */
+    public static TradeFill tradeFill(long tid, Instant time) {
+        return new TradeFill(tid, time, "BTC", "BTC", TradeFill.Side.BUY, "Open Long",
+                new BigDecimal("0.01"), new BigDecimal("100000"), BigDecimal.ZERO,
+                new BigDecimal("0.5"), "USDC", false);
     }
 
     /** Jeden wpis z app.strategies, skladany recznie zamiast ladowania YAML-a. */

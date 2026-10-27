@@ -27,4 +27,38 @@ public final class HyperliquidResponses {
 
     /** Staking. {@code delegated} is the amount currently delegated to validators. */
     public record DelegatorSummary(BigDecimal delegated) {}
+
+    /**
+     * Jeden zrealizowany fill z {@code userFills}/{@code userFillsByTime}.
+     *
+     * <p>Wszystkie pola są obiektami, nie primitywami, bo API pomija te, które są puste
+     * ({@code builderFee} przy zerowej prowizji buildera) — a brakujący {@code tid} albo
+     * {@code time} oznacza wiersz, którego nie wolno uznać za obsłużony.
+     *
+     * <p>{@code side} to {@code "B"} (kupno) albo {@code "A"} (sprzedaż). {@code dir} opisuje to
+     * samo słowami i bogaciej: {@code Open Long}, {@code Reduce Short}, {@code Buy}, {@code Sell}.
+     * {@code coin} dla perpa jest tickerem, dla spotu indeksem w postaci {@code "@107"}.
+     */
+    public record Fill(Long tid,
+                       Long time,
+                       String coin,
+                       BigDecimal px,
+                       BigDecimal sz,
+                       String side,
+                       String dir,
+                       BigDecimal closedPnl,
+                       BigDecimal fee,
+                       String feeToken,
+                       Long oid) {}
+
+    /**
+     * Słownik rynków spot. Potrzebny tylko po to, żeby {@code "@107"} z filla zamienić na
+     * czytelnego tickera: {@code universe[].name} równe {@code "@107"} wskazuje przez
+     * {@code tokens[0]} na indeks tokena w {@code tokens[]}.
+     */
+    public record SpotMeta(List<SpotUniverseEntry> universe, List<SpotTokenMeta> tokens) {}
+
+    public record SpotUniverseEntry(String name, List<Integer> tokens, Integer index) {}
+
+    public record SpotTokenMeta(String name, Integer index) {}
 }

@@ -153,6 +153,36 @@ public class PortfolioProperties {
         private AssetRef perps = new AssetRef();
         /** Asset used for delegated (staked) HYPE. */
         private AssetRef staking = new AssetRef();
+        /** Powiadomienia o zrealizowanych zleceniach — osobny przebieg, ten sam adres. */
+        private FillAlerts fillAlerts = new FillAlerts();
+    }
+
+    /**
+     * Alerty o realizacji zlecen na Hyperliquid: spot i perpy, odpytywane cyklicznie.
+     *
+     * <p>Domyslnie wylaczone, bo to jedyna czesc modulu, ktora sama z siebie wysyla wiadomosci.
+     */
+    @Getter
+    @Setter
+    public static class FillAlerts {
+        private boolean enabled = false;
+        /**
+         * Odstep miedzy przebiegami. Zapytanie wazy 20 przy budzecie 1200 na minute, wiec 45 s
+         * to okolo 3% limitu — gestszy polling tez jest bezpieczny.
+         */
+        private Duration pollInterval = Duration.ofSeconds(45);
+        /**
+         * Ile wiadomosci wolno wyslac w jednym przebiegu. Nadwyzka jest zapisywana jako
+         * obsluzona i kwitowana jedna linia podsumowania.
+         */
+        private int maxMessagesPerRun = 10;
+        /**
+         * Jak daleko w przeszlosc zaglada pierwszy przebieg. Te fille sa zapamietywane BEZ
+         * powiadamiania — inaczej wlaczenie alertow wysypaloby na Telegram cala historie.
+         */
+        private Duration bootstrapLookback = Duration.ofHours(24);
+        /** Po tym czasie wiersz o obsluzonym fillu jest usuwany; tabela nie rosnie bez konca. */
+        private Duration retention = Duration.ofDays(30);
     }
 
     @Getter
