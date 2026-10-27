@@ -20,3 +20,27 @@ portfolio:
   enabled: false
   cmc:
     api-key: ""
+
+# Lista strategii jest wymagana: ScenarioRegistry czyta ja w @PostConstruct i w obu getterach,
+# wiec brak klucza `app.strategies` to NPE przy starcie kontekstu. Ten zestaw odwzorowuje dev —
+# wlaczona jest tylko FVG_LTF_CONFIRMATION.
+app:
+  strategies:
+    - name: DOUBLE_DIVERGENCE_STRATEGY
+      enabled: false
+      timeframes: [ H1, H2, H4, H12, D1 ]
+    - name: FVG_KEYLEVEL_DIVERGENCE_STRATEGY
+      enabled: false
+      timeframes: [ M5, M15, H1, H4 ]
+    - name: GRINDER_SWING_D1_H1
+      enabled: false
+      timeframes: [ H1 ]
+    - name: GRINDER_POSITION_W1_H4
+      enabled: false
+      timeframes: [ H4 ]
+    - name: FVG_LTF_CONFIRMATION
+      enabled: true
+      timeframes: [ M1, M3, M5, M15, H1, H4 ]
+  telegram:
+    bot-token: test-token
+    chat-id: "0"

@@ -310,4 +310,21 @@ class WebhookProcessingServiceHandlePriceUpdateTest {
                 .isNull();
         assertThat(after.getAlertMode()).isEqualTo(AlertMode.ARMED);
     }
+
+    @Test
+    void shouldNotReprocess_whenFvgAlreadyConsumed() {
+        // Straz w produkcji to `status == FILLED || status == CONSUMED`. Druga polowa nie byla
+        // sprawdzona, a strefa CONSUMED wraca z findIntersectingOpenFvgs tylko w JPA (fake ja
+        // odfiltrowuje), wiec jest to tez dokumentacja roznicy miedzy fake'em a adapterem.
+        FvgZone fvg = TestFixtures.saveFvg(fvgRepo, Timeframe.H1, Direction.LONG, LOWER, UPPER, FvgStatus.CONSUMED);
+
+        PriceUpdateDto dto = TestFixtures.priceUpdate(Timeframe.H1,
+                new BigDecimal("60500"),
+                new BigDecimal("59800"),
+                new BigDecimal("60000"));
+
+        service.handlePriceUpdate(dto);
+
+        assertThat(fvgRepo.findById(fvg.getId()).orElseThrow().getStatus()).isEqualTo(FvgStatus.CONSUMED);
+    }
 }
