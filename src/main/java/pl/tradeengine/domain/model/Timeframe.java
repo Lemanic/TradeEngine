@@ -13,6 +13,7 @@ public enum Timeframe {
     H1(Duration.ofHours(1)),
     H2(Duration.ofHours(2)),
     H4(Duration.ofHours(4)),
+    H8(Duration.ofHours(8)),
     H12(Duration.ofHours(12)),
     D1(Duration.ofDays(1)),
     W1(Duration.ofDays(7));
