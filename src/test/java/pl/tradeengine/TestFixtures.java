@@ -1,8 +1,13 @@
 package pl.tradeengine;
 
+import pl.tradeengine.application.dto.DivergenceAlertDto;
+import pl.tradeengine.application.dto.FvgAlertDto;
+import pl.tradeengine.application.dto.MomentumAlertDto;
 import pl.tradeengine.application.dto.PriceUpdateDto;
 import pl.tradeengine.backtest.repository.InMemoryFvgRepository;
+import pl.tradeengine.config.StrategyProperties;
 import pl.tradeengine.domain.event.SwingPointDetectedEvent;
+import pl.tradeengine.domain.model.AlertToSend;
 import pl.tradeengine.domain.model.Direction;
 import pl.tradeengine.domain.model.DivergenceSignal;
 import pl.tradeengine.domain.model.FvgKind;
@@ -14,6 +19,9 @@ import pl.tradeengine.domain.port.FvgRepository;
 
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
 
 public final class TestFixtures {
 
@@ -88,5 +96,58 @@ public final class TestFixtures {
                                   BigDecimal lower, BigDecimal upper, FvgStatus status) {
         FvgZone f = new FvgZone(null, BTC, tf, direction, lower, upper, 1.0, FvgKind.FVG, status);
         return repo.save(f);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // DTO webhookow. Mapowanie i walidacja mieszkaja w prywatnych mapDtoTo* serwisu, wiec
+    // testuje sie je wylacznie przez te rekordy — same DTO sa plaskie i nie maja czego testowac.
+    // ─────────────────────────────────────────────────────────────
+
+    /** Payload FVG z TradingView. signalType decyduje o FvgKind (FVG_ vs IFVG_). */
+    public static FvgAlertDto fvgAlert(Timeframe tf, String direction, String signalType, String fvgStatus) {
+        return new FvgAlertDto(
+                BTC.code(), tf.name(), signalType, direction,
+                new BigDecimal("60000"), new BigDecimal("61000"), fvgStatus);
+    }
+
+    /** Wariant domyslny: zwykly FVG w statusie CREATED. */
+    public static FvgAlertDto fvgAlert(Timeframe tf, Direction direction) {
+        return fvgAlert(tf, direction.name(), "FVG_BULLISH", "CREATED");
+    }
+
+    public static DivergenceAlertDto divergenceAlert(Timeframe tf, String direction) {
+        return new DivergenceAlertDto(BTC.code(), tf.name(), "DIVERGENCE", direction);
+    }
+
+    /** signal jest w payloadzie, ale WebhookProcessingService go nie czyta — liczy sie direction. */
+    public static MomentumAlertDto momentumAlert(Timeframe tf, String direction) {
+        return new MomentumAlertDto(BTC.code(), tf.name(), "MOMENTUM_WAVE", direction);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Alert i konfiguracja strategii
+    // ─────────────────────────────────────────────────────────────
+
+    /** AlertToSend z wypelnionymi polami — do testow, ktore tylko przepuszczaja alert dalej. */
+    public static AlertToSend alert(String scenarioName) {
+        return new AlertToSend(
+                BTC, Direction.LONG, scenarioName, Timeframe.H1,
+                new BigDecimal("60500"), Optional.empty(), Optional.empty(),
+                "TEST ALERT | " + scenarioName, FIXED_NOW);
+    }
+
+    /** Jeden wpis z app.strategies, skladany recznie zamiast ladowania YAML-a. */
+    public static StrategyProperties.StrategyConfig strategy(String name, boolean enabled, Timeframe... timeframes) {
+        StrategyProperties.StrategyConfig cfg = new StrategyProperties.StrategyConfig();
+        cfg.setName(name);
+        cfg.setEnabled(enabled);
+        cfg.setTimeframes(Arrays.asList(timeframes));
+        return cfg;
+    }
+
+    public static StrategyProperties strategies(StrategyProperties.StrategyConfig... configs) {
+        StrategyProperties props = new StrategyProperties();
+        props.setStrategies(List.of(configs));
+        return props;
     }
 }

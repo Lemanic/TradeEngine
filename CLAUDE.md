@@ -37,22 +37,61 @@ Supply them outside the repository, in `config/application-{profile}.yml` (git-i
 - Use `@ExtendWith(MockitoExtension.class)` for pure unit tests (no Spring context)
 - Use `@SpringBootTest` + `@ActiveProfiles("test")` only for integration tests that need the full context
 
+### Coverage
+
+`jacoco-maven-plugin` runs on every `mvn test`; the report lands in
+`target/site/jacoco/index.html`. **There is deliberately no `check` rule** — coverage is there to
+be looked at, never to fail a build.
+
 ### Test profile
-Create `src/test/resources/application-test.yml` with H2 datasource and stub env vars:
-```yaml
-spring.datasource.url: jdbc:h2:mem:testdb
-DB_USER: sa
-DB_PASSWORD: ""
-TELEGRAM_BOT_TOKEN: test-token
-TELEGRAM_CHAT_ID: "0"
-```
+
+`src/test/resources/application-test.yml` exists and holds the H2 datasource plus stubs for the
+env-var placeholders that the dev/prod YAML reads. Two things in it are load-bearing and easy to
+delete by accident:
+
+- **`app.strategies` must be present.** `ScenarioRegistry` reads it in `@PostConstruct` and in both
+  getters, so a profile without that key fails context startup with an NPE, not with a readable
+  message.
+- **`LoggingAlertPublisher` is `@Profile({"dev", "test"})`.** `AlertPublisher` has no other
+  implementation outside `prod` (Telegram), so without `test` on that list every
+  `@SpringBootTest @ActiveProfiles("test")` dies on a missing `AlertPublisher` bean. That is why
+  `contextLoads` used to run under `dev` — and therefore depended on `DB_USER` in the environment
+  and on the git-ignored `config/application-dev.yml`.
 
 ### Conventions
 - Test class name: `<ClassName>Test` in the same package under `src/test/`
-- One test class per production class
+- One test class per production class. Exception: `WebhookProcessingService` is split per entry
+  point (`...HandleFvgTest`, `...HandleDivergenceTest`, `...HandleMomentumAlertTest`,
+  `...HandlePriceUpdateTest`, `...EventEmissionTest`), because one class per method keeps the
+  arrange blocks honest.
 - Use `InMemory*Repository` adapters (already exist in `backtest/`) as fakes — **do not mock repositories**
-- Builder pattern for domain fixtures: create a `TestFixtures` utility class in `src/test/java/pl/tradeengine/`
+- **`Mockito.verify` is not used anywhere in this suite.** To assert what a collaborator received,
+  write a fake that records it. The ones that exist, all in `src/test/java/pl/tradeengine/`:
+  `FakeAlertPublisher` (records published lists), `RecordingScenario` (records every `DomainEvent`
+  it saw), `RecordingBiasRepositoryFake` (keeps `reason`, which `InMemoryBiasRepository` logs and
+  drops), `StatefulFvgRepositoryFake` and `StatefulSwingPointRepositoryFake`.
+- `application/service/WebhookChainHarness` assembles the real production chain without Spring:
+  `WebhookProcessingService → ScenarioEngine → ScenarioRegistry → RecordingScenario` and
+  `AlertDispatchService → FakeAlertPublisher`. Use it whenever the assertion is about **which**
+  domain event was emitted — a mocked `ScenarioEngine` stubbed with `any()` cannot see that.
+- Fixtures: static factories in `TestFixtures` (not builders, despite what this file used to say).
 - For `GrinderStrategyScenario` tests: instantiate directly (like `BacktestApplication` does), don't load Spring
+
+### Where fakes disagree with the JPA adapters
+
+Relevant whenever a scenario test is green: the in-memory fakes and the real adapters have
+**opposite** window boundaries, so a fixture sitting exactly on the edge proves nothing.
+
+| Port | In-memory fake | JPA adapter |
+| --- | --- | --- |
+| `DivergenceRepository.findAllByDirectionSince` | `!isBefore(since)` — inclusive | `…DetectedAtAfter…` — **exclusive** |
+| `SwingPointRepository.findRecentSwings` | `isAfter(since)` — exclusive | `detectedAt >= :since` — **inclusive** |
+
+`StatefulSwingPointRepositoryFake` follows the adapter (inclusive) and implements
+`getLastSwingDirection`, which `InMemorySwingPointRepository` returns `null` from — without it the
+direction gate in `GrinderStrategyScenario` (lines 93 and 192) is always permissive and its two FVG
+branches cannot be tested at all. These boundaries can only be pinned for real with a
+`@DataJpaTest` on the adapters, which does not exist yet.
 
 ### What NOT to test
 - DTOs and Lombok-generated code
@@ -319,7 +358,9 @@ breaks `complete`.
 An amount is wealth data, so the tracked YAML holds a placeholder. A zero means "I hold nothing
 here right now" — the entry stays declared and comes back once the amount grows. `source` decides
 which slice of the portfolio the position joins; `key` is the stable identifier under which
-`PUT /api/portfolio/manual-holdings/{key}` addresses it.
+`PUT /api/portfolio/manual-holdings/{key}` addresses it. In production that one path sits
+behind an Access application of its own — see
+[Two Access applications, two sessions](#two-access-applications-two-sessions).
 
 **The configuration is a registry of WHICH positions exist; the current AMOUNT lives in the
 database** (table `manual_holding`). The YAML value is only a seed: `PortfolioConfig` inserts it on
@@ -537,7 +578,7 @@ Two subdomains point at **the same application**, so the access policy has to ac
 | Host | What it serves | Access |
 | --- | --- | --- |
 | `webhook.tradeengine.app` | `POST /webhooks/*` only | open — TradingView cannot authenticate |
-| `portfolio.tradeengine.app` | the dashboard at the root and `/api/portfolio/*` | Cloudflare Access on the whole host |
+| `portfolio.tradeengine.app` | the dashboard at the root and `/api/portfolio/*` | Cloudflare Access — **two applications**, see below |
 
 **Port: prod runs on 8080**, because `application-prod.yml` does not set `server.port` and Spring
 takes the default. Only dev has an explicit `8081`. So point verification commands on the machine
@@ -575,6 +616,66 @@ with a redirect to the login page, i.e. HTML with status 200. The front end reco
 `redirect: 'manual'` and `response.type === 'opaqueredirect'`, which is unambiguous because **the
 API never answers 3xx** — checked for every path, including a trailing slash. Adding a redirect
 under `/api` would break that detection.
+
+#### Two Access applications, two sessions
+
+`portfolio.tradeengine.app` is covered by **two** Access applications, not one, and each hands out
+its **own `CF_Authorization` cookie with its own session duration**:
+
+| Application | `aud` | Covers |
+| --- | --- | --- |
+| host-wide | `e705954a…` | `/`, `/api/portfolio/*`, `/v3/api-docs` |
+| path-scoped | `68dd411d…` | `/api/portfolio/manual-holdings` — the write path |
+
+So a live session is not a live session for everything. Measured on 2026-10-25 with one valid
+host-wide cookie: `/`, `/api/portfolio/summary` and `/v3/api-docs` answered `200`, while `GET` and
+`PUT` on `/api/portfolio/manual-holdings` answered `302` to the login page. Reads work, the write
+does not, and nothing is wrong with the application.
+
+**Logging in at the root does not mint the second cookie.** Access authenticates only the
+application a request actually asked for, so a session for the write path comes only from opening
+`https://portfolio.tradeengine.app/api/portfolio/manual-holdings` in the browser itself. The
+browser then holds **two cookies of the same name**, told apart only by their `Path` attribute
+(`/` versus `/api/portfolio/manual-holdings`). Copying the wrong one out of DevTools is the trap,
+and it looks exactly like an expired token.
+
+Why the second application exists is not recorded here — deliberately gating writes harder than
+reads would be a sensible reason, but it could equally be a leftover. Zero Trust shows its
+`Session Duration` and its creation date in the audit log; the same two numbers also settle whether
+a failing write means a lapsed session or an application added after the last successful write.
+**From outside those two causes are indistinguishable**, so do not guess between them.
+
+Diagnosing this from outside, in order:
+
+1. A `3xx` is always Access, never the API (see the paragraph above).
+2. Decode the `meta=` parameter of the login redirect. **`auth_status: NONE` means there is no
+   token for *that* application** — not that a token was rejected.
+3. Compare `aud` in the cookie against `aud` in that `meta`. Both are genuine application AUDs, so
+   a mismatch means two applications are in play, **not** that one was deleted and recreated.
+   Reading it the second way costs a pointless re-login, because the root mints the other cookie.
+4. `GET /api/portfolio/snapshots` answering **`405`** is the quick proof that a request crosses
+   Access and reaches Spring: that path lies outside the path-scoped application, so only the
+   missing GET handler stops it.
+
+Two consequences worth keeping:
+
+- **From outside, the write needs the service token — and that is the intended path.** The token
+  `tradeengine-staking` (Zero Trust → Access controls → Service credentials) is attached to the
+  path-scoped application and covers both verbs: verified 2026-10-26, `GET` and `PUT` on
+  `/api/portfolio/manual-holdings` each answered `200` carrying `CF-Access-Client-Id` and
+  `CF-Access-Client-Secret`. On the dev machine that pair lives in `config/cf-access.env`, kept out
+  of the repo by the `/config/` rule in `.gitignore`. **A browser session is simply the wrong
+  credential here**: a cookie minted at the root belongs to the host-wide application and is
+  refused on this path however fresh it is — which is exactly what makes the failure look like an
+  expired token and sends you re-logging in for nothing.
+- **`service_token_status: false` in the login `meta` describes the request that was made, not the
+  application's configuration.** It never proves that no token is attached; only the application's
+  policies in Zero Trust do. (An earlier version of this section drew the wrong conclusion here.)
+- **On the prod machine none of this applies**: `http://localhost:8080` skips Cloudflare entirely
+  and needs no credential at all.
+- **An amount can be verified without read access to `/manual-holdings`**: force a snapshot and
+  read it out of `positions[]`. That is how `TAO staking` 11.77 → 15.8676 was confirmed on
+  2026-10-25 while the read endpoint stayed gated.
 
 ### UI
 
