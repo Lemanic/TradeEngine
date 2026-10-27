@@ -40,6 +40,7 @@ class TimeframeTest {
         assertThat(Timeframe.M1.getDuration()).isEqualTo(Duration.ofMinutes(1));
         assertThat(Timeframe.M15.getDuration()).isEqualTo(Duration.ofMinutes(15));
         assertThat(Timeframe.H4.getDuration()).isEqualTo(Duration.ofHours(4));
+        assertThat(Timeframe.H8.getDuration()).isEqualTo(Duration.ofHours(8));
         assertThat(Timeframe.D1.getDuration()).isEqualTo(Duration.ofDays(1));
         assertThat(Timeframe.W1.getDuration()).isEqualTo(Duration.ofDays(7));
 

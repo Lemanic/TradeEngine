@@ -22,7 +22,7 @@ app:
   strategies:
     - name: DOUBLE_DIVERGENCE_STRATEGY
       enabled: false
-      timeframes: [ H1, H2, H4, H12, D1 ]
+      timeframes: [ H1, H2, H4, H8, H12, D1 ]
     - name: FVG_KEYLEVEL_DIVERGENCE_STRATEGY
       enabled: false
       timeframes: [ M5, M15, H1, H4 ]

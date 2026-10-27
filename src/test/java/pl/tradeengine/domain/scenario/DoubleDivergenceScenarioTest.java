@@ -154,9 +154,10 @@ class DoubleDivergenceScenarioTest {
 
     @Test
     void shouldTreatEveryNonHtfTimeframeAsRequiringAPair() {
-        // SINGLE_SIGNAL_TIMEFRAMES to tylko {H12, D1}. H2 i H4 sa w app.strategies dla tej
-        // strategii, a dotad reprezentowal je wylacznie H1.
-        for (Timeframe tf : new Timeframe[]{Timeframe.H2, Timeframe.H4}) {
+        // SINGLE_SIGNAL_TIMEFRAMES to tylko {H12, D1}. H2, H4 i H8 sa w app.strategies dla tej
+        // strategii, a dotad reprezentowal je wylacznie H1. H8 lezy miedzy H4 a H12, wiec to tu
+        // jest przypiete, po ktorej stronie granicy stoi: para, nie pojedynczy sygnal.
+        for (Timeframe tf : new Timeframe[]{Timeframe.H2, Timeframe.H4, Timeframe.H8}) {
             setUp();
             DivergenceSignal single = save(tf, Direction.LONG, ZonedDateTime.now());
             assertThat(scenario.onEvent(new DivergenceDetectedEvent(single)))
@@ -168,6 +169,20 @@ class DoubleDivergenceScenarioTest {
                     .as("para na %s", tf)
                     .hasSize(1);
         }
+    }
+
+    @Test
+    void shouldDeriveTheH8WindowFromTheEightHourCandle() {
+        // Okno to 35 swiec, czyli na H8 okolo 11,7 dnia. Test pilnuje Duration dla H8: przy
+        // pomylce (np. 8 minut zamiast 8 godzin) para z przed 11 dni przestaje sie liczyc.
+        save(Timeframe.H8, Direction.LONG, ZonedDateTime.now().minusDays(11));
+        DivergenceSignal inside = save(Timeframe.H8, Direction.LONG, ZonedDateTime.now());
+        assertThat(scenario.onEvent(new DivergenceDetectedEvent(inside))).hasSize(1);
+
+        setUp();
+        save(Timeframe.H8, Direction.LONG, ZonedDateTime.now().minusDays(12));
+        DivergenceSignal outside = save(Timeframe.H8, Direction.LONG, ZonedDateTime.now());
+        assertThat(scenario.onEvent(new DivergenceDetectedEvent(outside))).isEmpty();
     }
 
     @Test
