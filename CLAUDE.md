@@ -218,21 +218,29 @@ in both themes:
 | ordered by value (every pair possible) | **4**, and only two sets out of the eight colors pass; at **5** none of the 56 subsets passes |
 | fixed order (by name, neighbours invariant) | **6** — the current palette passes every check |
 
-So with five sources, repainting the hexes **will not help**: you have to either reduce the number
+So past four sources, repainting the hexes **will not help**: you have to either reduce the number
 of series (fold them into "Other"), or split them across panels, or fix the slice order. That
 changes how the chart is read, so it is **the user's decision**, neither ours nor theirs.
 
-As of today: **five sources** — `Hyperliquid`, `TAO staking`, `Trezor`, `TRB staking`, `Rabby`.
-With slices sorted by value, that is the range in which **no choice of colors from the documented
-eight passes the checks in both themes** (56 subsets checked). The donut works and every slice is
-labelled, but the contrast threshold is exceeded for some pair of neighbours.
+As of today: **six sources** — `Rabby`, `Trezor`, `Hyperliquid`, `Coinbase`, `TAO staking`,
+`TRB staking`. `Coinbase` is the one that arrived last; the five before it were everything this
+note described earlier. With slices sorted by value this is past the range in which **any choice of
+colors from the documented eight passes the checks in both themes** — already at five none of the
+56 subsets passed, and a sixth slice only adds pairs that can touch. The donut works and every
+slice is labelled, but the contrast threshold is exceeded for some pair of neighbours.
 
 The fix lies **neither in the backend nor in the palette**: either fold the smallest sources into
-"Other", or split them across panels, or fix the slice order (the current palette then passes for
-six). This is the user's decision about how his own chart is read — it is waiting for him.
+"Other", or split them across panels, or fix the slice order. Fixing the order is the one option
+that needs nothing else — the current palette was measured as passing every check at six sources in
+a fixed order, which is exactly where the portfolio now stands. This is the user's decision about
+how his own chart is read — it is waiting for him.
 
-Add a sixth source deliberately: with a fixed order it fits with no changes, with sorting by value
-it deepens the problem.
+Observed on the dashboard on 2026-10-27, with amounts masked: six slices at 44.0 / 36.8 / 10.5 /
+3.1 / 3.1 / 2.4 percent — so the two smallest are the obvious candidates for "Other" if that is the
+route chosen.
+
+A **seventh** source goes beyond everything measured: six is where the fixed-order check stops, so
+adding one means asking the dashboard side to re-run the validator rather than assuming it fits.
 
 ### Degradation rules
 
