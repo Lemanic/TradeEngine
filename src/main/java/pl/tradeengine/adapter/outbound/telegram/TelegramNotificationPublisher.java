@@ -2,6 +2,7 @@ package pl.tradeengine.adapter.outbound.telegram;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
@@ -41,6 +42,12 @@ public class TelegramNotificationPublisher implements NotificationPublisher {
     private final String chatId;
     private final RestClient restClient;
 
+    /**
+     * {@code @Autowired} jest tu konieczne, mimo jednego kandydata: klasa ma DWA konstruktory
+     * (drugi, pakietowy, wstrzykuje {@link RestClient} w testach), a przy dwóch nieoznaczonych
+     * Spring szuka bezargumentowego i wywraca start na {@code No default constructor found}.
+     */
+    @Autowired
     public TelegramNotificationPublisher(@Value("${app.telegram.bot-token}") String botToken,
                                          @Value("${app.telegram.chat-id}") String chatId) {
         this(API_BASE_URL, botToken, chatId, RestClient.builder()

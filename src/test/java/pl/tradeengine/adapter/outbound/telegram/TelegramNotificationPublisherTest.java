@@ -5,9 +5,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.core.env.MapPropertySource;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
@@ -34,6 +39,28 @@ class TelegramNotificationPublisherTest {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
         publisher = new TelegramNotificationPublisher(BASE_URL, TOKEN, CHAT_ID, builder.build());
+    }
+
+    /**
+     * Ten bean jest @Profile("prod"), wiec zaden @SpringBootTest w profilu test go nie tworzy —
+     * i wlasnie dlatego brakujacy @Autowired przy DWOCH konstruktorach wyszedl dopiero na
+     * produkcji, jako "No default constructor found" i wywrocony start calej aplikacji.
+     * Ten test odtwarza samo rozstrzyganie konstruktora przez Springa: bez kontekstu Boota,
+     * bez bazy, w kilka milisekund.
+     */
+    @Test
+    void springResolvesTheInjectedConstructor() {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.getEnvironment().setActiveProfiles("prod");
+            context.getEnvironment().getPropertySources().addFirst(new MapPropertySource(
+                    "telegram", Map.<String, Object>of(
+                            "app.telegram.bot-token", TOKEN,
+                            "app.telegram.chat-id", CHAT_ID)));
+            context.register(TelegramNotificationPublisher.class);
+            context.refresh();
+
+            assertThat(context.getBean(TelegramNotificationPublisher.class)).isNotNull();
+        }
     }
 
     @Test
