@@ -20,6 +20,10 @@ portfolio:
   enabled: false
   cmc:
     api-key: ""
+  hyperliquid:
+    # Żadnego odpytywania giełdy ani wysyłania wiadomości z testów.
+    fill-alerts:
+      enabled: false
 
 # Lista strategii jest wymagana: ScenarioRegistry czyta ja w @PostConstruct i w obu getterach,
 # wiec brak klucza `app.strategies` to NPE przy starcie kontekstu. Ten zestaw odwzorowuje dev —

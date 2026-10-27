@@ -7,7 +7,7 @@
 
 **TradeEngine** is an advanced backend system for automated trading, built on **Price Action** analysis and **Smart Money Concepts (SMC)**. The application identifies key market structures (Fair Value Gaps, Key Levels, market bias) and combines them with momentum confirmations (Divergences, WaveTrend crosses) to generate **High Probability Setups**.
 
-Currently operating as a real-time **Signal Provider** (via Telegram integration), the architecture is designed to support full **Order Execution** in future iterations. A second, independent module tracks a crypto **portfolio** and feeds a dashboard — see [Portfolio module](#-portfolio-module).
+Currently operating as a real-time **Signal Provider** (via Telegram integration), the architecture is designed to support full **Order Execution** in future iterations. A second, independent module tracks a crypto **portfolio** and feeds a dashboard — see [Portfolio module](#-portfolio-module) — and a third notifies on Telegram whenever an order actually fills on the exchange, see [Fill alerts](#-fill-alerts-hyperliquid--telegram).
 
 ---
 ## 🏗 System Architecture
@@ -34,12 +34,20 @@ graph LR
     F -.->|Future Execution| H[Exchange API]
     end
 
+    subgraph Fill Alerts
+    P[Hyperliquid /info] -->|poll, fixed delay| Q(FillAlertService)
+    Q -->|dedup by trade id| E
+    Q -->|Format & Send| G
+    end
+
     style A fill:#f9f,stroke:#333,stroke-width:2px
     style B fill:#bbf,stroke:#333,stroke-width:2px
     style E fill:#bfb,stroke:#333,stroke-width:2px
 
 ```
-`AlertPublisher` is profile-bound: Telegram in `prod`, a logging publisher in `dev` and `test`.
+`AlertPublisher` is profile-bound: Telegram in `prod`, a logging publisher in `dev` and `test`. The
+fill alerts enter from the opposite side — the application polls the exchange instead of being
+pushed to — and travel over their own one-method port, `NotificationPublisher`, bound the same way.
 
 ## 🚀 Key Features
 
@@ -47,6 +55,7 @@ graph LR
 *   **Event-Driven Approach:** Every market signal is treated as a distinct domain event for auditability.
 *   **Data-Driven Strategy Enablement:** Strategies are switched on and bound to timeframes from YAML (`app.strategies`), with no code change and no redeploy.
 *   **Standalone Backtesting:** The same scenario code runs headless against historical CSV candles and exports results as Pine Script overlays.
+*   **Fill Notifications:** A Telegram message whenever an order fills on Hyperliquid — spot, leveraged and liquidations — deduplicated by the exchange's own trade id, so a message is never sent twice or lost across a restart.
 *   **Secure Ingress:** Cloudflare Tunnel / Zero Trust configuration preventing public IP exposure.
 
 ## 🧠 Strategy Logic & Algorithms
@@ -150,6 +159,37 @@ Two behaviours worth naming:
 *   **`brak danych` is shown, not a zero.** A window longer than the collected history (the `30 dni` tile above) stays empty instead of implying a flat portfolio.
 *   **After an API error the front end never substitutes demo data** — mock mode exists only behind an explicit build flag. Quietly slipping fictional numbers into a view where financial decisions are made is worse than an error message.
 
+## 🔔 Fill alerts (Hyperliquid → Telegram)
+
+The strategies tell you what *might* be worth doing; this tells you what **actually happened on the
+account**. A fixed-delay poll of Hyperliquid's public `/info` API sends a Telegram message whenever
+an order of the configured address fills — a spot buy or sell, a leveraged open or reduce, and a
+liquidation too. It reuses the portfolio's Hyperliquid connector, address and spot whitelist, so it
+needs **no new environment variable** and no key: the address goes in the request body.
+
+```
+🟢 HYPERLIQUID · Open Long          🔴 HYPERLIQUID · Reduce Long
+BTC  0.0123 @ 108450.5              BTC  0.0123 @ 109000
+Wartość: 1333.94 USD                Wartość: 1340.70 USD
+Prowizja: 0.47 USDC                 PnL: +6.73 USDC
+2026-10-27 14:32 UTC                2026-10-27 15:10 UTC
+```
+
+The header is the API's own `dir` field, copied verbatim. There is **no branch for liquidation
+anywhere in the code** — an event nobody foresaw describes itself (`Liquidated Isolated Long`),
+which is the whole point of not mapping that field onto an enum of our own.
+
+Three decisions that are not obvious from the code:
+
+*   **Deduplication is by the exchange's trade id, not by time.** The `startTime` bound is inclusive and several fills can share a millisecond, so the last handled fill comes back on every poll; what rejects it is a primary key. One table is both the cursor (`max(fill_time)`) and the dedup set.
+*   **An empty table means "first run", not "nothing happened".** The API remembers up to 10 000 fills, so a first run records the recent ones **without notifying** and sends a single confirmation message instead — which doubles as proof that the whole path to Telegram works.
+*   **A backlog is capped per run.** After an outage a poll can see dozens of fills; the oldest are sent and the rest are closed with one summary line. A flooded channel is worse than a lost detail.
+
+A WebSocket subscription would push in a second rather than in up to a minute, but it adds
+reconnects, keepalives and snapshot-frame filtering; at a request weight of 20 against 1200 per
+minute, polling costs about 3% of the budget and far less code. Funding, transfers and TWAP slice
+fills are separate endpoints and deliberately not read.
+
 ## 🛠️ Tech Stack & Infrastructure
 
 ### Core Backend
@@ -159,7 +199,7 @@ Two behaviours worth naming:
 *   **Tools:** Lombok, Maven, springdoc (OpenAPI 3.1).
 
 ### Testing
-*   JUnit 5 + Mockito + AssertJ, 36 test classes; JaCoCo report on every `mvn test` (`target/site/jacoco/index.html`).
+*   JUnit 5 + Mockito + AssertJ, 43 test classes; JaCoCo report on every `mvn test` (`target/site/jacoco/index.html`).
 *   Repositories are never mocked — the in-memory adapters from `backtest/` serve as fakes, and collaborators are asserted through recording fakes rather than `verify`.
 
 ### Connectivity & Security
@@ -188,8 +228,9 @@ src/main/java/pl/tradeengine/
     └── util/           — PriceFormatter, PriceCandleUtils
 ```
 
-The portfolio module lives in a `portfolio/` sub-package of each layer; its hand-run PostgreSQL
-schema is in `sql/portfolio_schema.sql`.
+The portfolio module lives in a `portfolio/` sub-package of each layer and the fill alerts in a
+`fill/` one, sharing the Hyperliquid connector with the portfolio; the hand-run PostgreSQL schema
+for both is in `sql/portfolio_schema.sql`.
 
 ## ⚙️ Build & Run
 
@@ -225,7 +266,7 @@ variables (CMC key, wallet addresses) — all defaulted to empty and supplied fr
 The project is continuously evolving from a signal provider into a full-stack trading platform.
 
 ### 🔹 Core Execution & Risk Management
-- [ ] **Exchange Integration:** Order execution for **Bybit** and **Hyperliquid**. (Hyperliquid is already read from for the portfolio module — that connector is read-only, no trading.)
+- [ ] **Exchange Integration:** Order execution for **Bybit** and **Hyperliquid**. (Hyperliquid is already read from — for the portfolio module and for [fill alerts](#-fill-alerts-hyperliquid--telegram) — but that connector is read-only: it reports fills, it does not place orders.)
 - [ ] **Smart Risk Engine:** Automated position sizing based on Account Equity % and dynamic Stop Loss levels. Scenarios currently emit alerts with empty `sl` / `tp`.
 - [ ] **Trade Management:** Logic for Breakeven triggers, Trailing Stops, and Partial Take Profits.
 

@@ -48,3 +48,18 @@ CREATE TABLE manual_holding
     amount      NUMERIC(38, 18)          NOT NULL,
     updated_at  TIMESTAMP WITH TIME ZONE NOT NULL
 );
+
+-- Fille z Hyperliquid, o których już powiadomiono na Telegramie.
+-- Jedna tabela robi dwie rzeczy: tid nadany przez giełdę jest kluczem głównym (więc powtórny
+-- odczyt tego samego filla nie wywoła drugiej wiadomości), a max(fill_time) jest kursorem dla
+-- kolejnego zapytania userFillsByTime. Pusta tabela znaczy "pierwsze uruchomienie" — wtedy
+-- fille z ostatnich godzin są zapisywane BEZ powiadamiania.
+CREATE TABLE hyperliquid_fill
+(
+    tid         BIGINT PRIMARY KEY,
+    fill_time   TIMESTAMP WITH TIME ZONE NOT NULL,
+    coin        VARCHAR(64)              NOT NULL,
+    notified_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+CREATE INDEX idx_hyperliquid_fill_time ON hyperliquid_fill (fill_time DESC);

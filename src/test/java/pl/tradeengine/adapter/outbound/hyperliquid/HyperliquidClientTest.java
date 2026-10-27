@@ -81,6 +81,80 @@ class HyperliquidClientTest {
     }
 
     @Test
+    void asksForFillsByTimeWithTheWholeBody() {
+        server.expect(requestTo(BASE_URL + "/info"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.type").value("userFillsByTime"))
+                .andExpect(jsonPath("$.user").value(ADDRESS))
+                .andExpect(jsonPath("$.startTime").value(1793620000000L))
+                // Sklejanie po czasie zepsuloby dedup: jedno zlecenie w kilku kawalkach
+                // dostawaloby za kazdym razem inny tid.
+                .andExpect(jsonPath("$.aggregateByTime").value(false))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+
+        assertThat(client.userFillsByTime(BASE_URL, ADDRESS, 1793620000000L)).isEmpty();
+        server.verify();
+    }
+
+    @Test
+    void readsFillsAndKeepsPricesExact() {
+        server.expect(requestTo(BASE_URL + "/info"))
+                .andExpect(jsonPath("$.type").value("userFillsByTime"))
+                .andRespond(withSuccess("""
+                        [{"tid":1234567890123,"time":1793620331000,"coin":"BTC","px":"108450.5",
+                          "sz":"0.01234567","side":"B","dir":"Open Long","closedPnl":"0.0",
+                          "fee":"0.470213","feeToken":"USDC","oid":55512345,"hash":"0xabc",
+                          "startPosition":"0.0","crossed":true,"builderFee":"0.01"}]
+                        """, MediaType.APPLICATION_JSON));
+
+        var fills = client.userFillsByTime(BASE_URL, ADDRESS, 0L);
+
+        assertThat(fills).hasSize(1);
+        assertThat(fills[0].tid()).isEqualTo(1234567890123L);
+        assertThat(fills[0].px().toPlainString()).isEqualTo("108450.5");
+        assertThat(fills[0].sz().toPlainString()).isEqualTo("0.01234567");
+        assertThat(fills[0].side()).isEqualTo("B");
+        assertThat(fills[0].dir()).isEqualTo("Open Long");
+    }
+
+    @Test
+    void toleratesAFillWithoutTheOptionalFields() {
+        server.expect(requestTo(BASE_URL + "/info"))
+                .andRespond(withSuccess("""
+                        [{"tid":7,"time":1793620331000,"coin":"@107","px":"0.0121","sz":"1000",
+                          "side":"A","dir":"Sell"}]
+                        """, MediaType.APPLICATION_JSON));
+
+        var fill = client.userFillsByTime(BASE_URL, ADDRESS, 0L)[0];
+
+        assertThat(fill.closedPnl()).isNull();
+        assertThat(fill.fee()).isNull();
+        assertThat(fill.feeToken()).isNull();
+        assertThat(fill.coin()).isEqualTo("@107");
+    }
+
+    @Test
+    void readsTheSpotDictionaryWithoutAnAddress() {
+        server.expect(requestTo(BASE_URL + "/info"))
+                .andExpect(jsonPath("$.type").value("spotMeta"))
+                .andExpect(jsonPath("$.user").doesNotExist())
+                .andRespond(withSuccess("""
+                        {"universe":[{"name":"@107","tokens":[292,0],"index":107,
+                                      "isCanonical":false}],
+                         "tokens":[{"name":"HPENGU","index":292,"szDecimals":0},
+                                   {"name":"USDC","index":0}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        var meta = client.spotMeta(BASE_URL);
+
+        assertThat(meta.universe()).hasSize(1);
+        assertThat(meta.universe().getFirst().name()).isEqualTo("@107");
+        assertThat(meta.universe().getFirst().tokens()).containsExactly(292, 0);
+        assertThat(meta.tokens().getFirst().name()).isEqualTo("HPENGU");
+        server.verify();
+    }
+
+    @Test
     void failsOnHttpError() {
         server.expect(requestTo(BASE_URL + "/info"))
                 .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));

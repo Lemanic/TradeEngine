@@ -128,6 +128,18 @@ portfolio:
     # wyrażamy go jako dolary, wyceniane ceną USDC (~1), w osobnym wierszu.
     perps: { asset: USD, cmc-id: 3408 }
     staking: { asset: HYPE, cmc-id: 32196 }
+    # Alerty na Telegramie o zrealizowanych zleceniach (spot i perpy).
+    # Kursor i dedup trzyma tabela hyperliquid_fill — klucz główny na tid giełdy.
+    fill-alerts:
+      enabled: true
+      # Zapytanie waży 20 przy budżecie 1200/min, więc to ~3% limitu.
+      poll-interval: 45s
+      # Zaległości po przestoju: tyle wiadomości na przebieg, reszta jednym podsumowaniem.
+      max-messages-per-run: 10
+      # Pierwszy przebieg zapamiętuje te fille BEZ powiadamiania — inaczej włączenie alertów
+      # wysypałoby na Telegram całą historię, którą API pamięta (do 10000 filli).
+      bootstrap-lookback: 24h
+      retention: 30d
   blockbook:
     connect-timeout: 5s
     read-timeout: 20s

@@ -471,6 +471,71 @@ are not positionally aligned** (330 vs 1003 entries). Join on `ctx.coin` equal t
 `universe[].name`, never by `zip`. Our adapter does not use that endpoint — prices come from
 CoinMarketCap — but I am noting it, because it is the natural reflex when diagnosing.
 
+#### Fill alerts (Telegram)
+
+Independent of the snapshots and of `portfolio.enabled`: a fixed-delay poll that sends a Telegram
+message whenever an order of this address fills — spot buy/sell, perp open/reduce, liquidation.
+Config is `portfolio.hyperliquid.fill-alerts`, **off by default**, on in prod. It deliberately
+lives under `portfolio.hyperliquid`, because it reuses that section's address, base-url, timeouts
+and spot whitelist — **still no environment variable of its own**.
+
+```
+FillAlertScheduler (fixedDelay 45s)  →  FillAlertService
+    →  TradeFillSource        (HyperliquidFillSource: POST /info, userFillsByTime)
+    →  TradeFillRepository    (table hyperliquid_fill — cursor and dedup in one)
+    →  NotificationPublisher  (Telegram in prod, log in dev/test)
+```
+
+**Not reusing `AlertPublisher`/`AlertToSend` is deliberate.** Only `description` ever reaches
+Telegram (`AlertToSend.toString()` returns it alone), so a fill *would* pass through with four
+nulls — but `Symbol`/`Direction`/`Timeframe`/`scenarioName` are strategy-shaped (a spot buy is
+neither LONG nor SHORT, a fill has no timeframe) and `BacktestRunner` already reads those getters.
+Hence a one-method port `NotificationPublisher`. `LoggingNotificationPublisher` is
+`@Profile({"dev", "test"})` for the same reason `LoggingAlertPublisher` is — without `test` on that
+list every `@SpringBootTest @ActiveProfiles("test")` would die on a missing bean.
+
+**Nor does it reuse `TelegramAlertPublisher`**, which registers a `TelegramLongPollingBot`: a
+second bot on the same token means two `getUpdates` and a 409 from Telegram.
+`TelegramNotificationPublisher` just POSTs to `sendMessage` through a `RestClient` — no bot
+registration, and testable with `MockRestServiceServer`, which the long-polling one is not.
+
+Five things that are easy to get wrong here:
+
+- **Dedup is by `tid`, not by time.** `startTime` in `userFillsByTime` is *inclusive* and several
+  fills can share a millisecond, so the last handled fill comes back on every single run. What
+  rejects it is the primary key on `tid`; the cursor is just `max(fill_time)`. One table does both
+  jobs, there is no cursor row.
+- **An empty table means "first run", not "nothing happened".** The API remembers up to 10000
+  fills, so a first run stores what it sees from `bootstrap-lookback` (24h) back **without
+  notifying** and sends one confirmation message instead. That message is also the proof that the
+  whole path to Telegram works.
+- **A fill is stored as handled even when no message went out** (over the per-run cap). That is why
+  `NotificationPublisher.send` must never throw — otherwise one network error would repeat the
+  alert forever. Both implementations swallow and log.
+- **`max-messages-per-run` (10) caps a backlog**, sends the oldest and closes with one summary
+  line. After a long outage a run can see dozens of fills; a flooded channel is worse than a lost
+  detail.
+- **A spot fill's `coin` is not a ticker** but a market index (`"@107"`, or `"PURR/USDC"` for
+  canonical pairs). `SpotAssetNames` resolves it through one cached `spotMeta` call and then
+  through the same `spot-tokens` aliases the valuation uses (`UETH`→ETH, `HPENGU`→PENGU). The
+  **raw** name goes to the database and the resolved one into the message: dedup must not depend on
+  whether that dictionary answered. When it does not, the message carries `@107` — ugly, but
+  better than no alert.
+
+`FillAlertScheduler` registers its task through `SchedulingConfigurer`, **not** with
+`@Scheduled(fixedDelayString = …)`: that attribute accepts only a millisecond number or ISO-8601,
+so a readable `poll-interval: 45s` from YAML would fail the startup with a `NumberFormatException`.
+`ScheduledTaskRegistrar` takes a `Duration` directly. It is `fixedDelay`, not `fixedRate`, so a
+slow exchange response cannot build up overlapping polls.
+
+Rate limits are a non-issue: the query weighs 20 against 1200/minute per IP, so a 45 s poll uses
+about 3%. A WebSocket subscription (`userFills`) would push in a second but adds reconnects,
+ping/pong and filtering the first `isSnapshot: true` frame — deliberately not taken.
+
+What it deliberately does not read: funding (`userFunding`), transfers
+(`userNonFundingLedgerUpdates`) and TWAP slice fills (`userTwapSliceFills`). Each is a separate
+endpoint and a separate mapping; a TWAP order shows up here as a series of ordinary fills.
+
 #### UTXO chains (xpub via Blockbook)
 
 `portfolio.blockbook` reads balances from an extended public key through Trezor's public Blockbook
@@ -518,14 +583,24 @@ Prod runs with `ddl-auto: validate`, so the tables have to exist **before** star
 psql -h localhost -U <user> -d postgres -f sql/portfolio_schema.sql
 ```
 
-The script creates **three** tables: `portfolio_snapshot`, `portfolio_position` and
-`manual_holding`. It agrees with the entities on columns, types and scales (verified by exporting
-Hibernate's DDL with the Postgres dialect). Dev (H2, `create`) builds them from the entities itself.
+The script creates **four** tables: `portfolio_snapshot`, `portfolio_position`,
+`manual_holding` and `hyperliquid_fill`. It agrees with the entities on columns, types and scales
+(verified by exporting Hibernate's DDL with the Postgres dialect). Dev (H2, `create`) builds them
+from the entities itself.
 
-`manual_holding` arrived later than the other two, so on a machine that came up before it,
-`validate` will fail the startup — the script has to be run again (`CREATE TABLE` for existing
-tables will raise an error, in which case run just the `CREATE TABLE manual_holding` from the end
-of the file).
+`manual_holding` and `hyperliquid_fill` arrived later than the first two, so on a machine that came
+up before them, `validate` will fail the startup — the script has to be run again (`CREATE TABLE`
+for existing tables will raise an error, in which case run just the missing `CREATE TABLE` from the
+end of the file).
+
+`hyperliquid_fill` is not a trade history: it holds no price and no amount, only the knowledge that
+a fill was already handled. Losing it costs nothing worse than one bootstrap message — see
+[Fill alerts](#fill-alerts-telegram).
+
+It is pruned to `fill-alerts.retention` (30 days) on every run, **except when that would empty it
+completely**. After 30 days without a trade every row is older than the window, and an empty table
+means "first run", which stays silent — so without that guard a fill landing between those two runs
+would get no alert. The newest row therefore always survives, which also keeps the cursor alive.
 
 `portfolio_snapshot` keeps **both** totals (`total_usd`, `total_pln`), because history, changes and
 the ATH are computed separately for each currency — the peak in PLN may fall on a different day
@@ -602,8 +677,9 @@ why a *default-deny* rule for this host sits in Cloudflare WAF:
 → Block. It also closes `/portfolio*`, `/v3/api-docs`, `/api/signals/*` and whatever comes later.
 Access on the other host does not take care of this — policies work per host.
 
-Before the first startup on prod: the WAF rule, then `sql/portfolio_schema.sql` (**three** tables —
-if the database came up before `manual_holding` was added, run just `CREATE TABLE manual_holding`),
+Before the first startup on prod: the WAF rule, then `sql/portfolio_schema.sql` (**four** tables —
+if the database came up earlier, run just the `CREATE TABLE` that is missing, `manual_holding` or
+`hyperliquid_fill`),
 then `config/application-prod.yml` **in the process's working directory** (`./config/` is resolved
 against the cwd, not against the jar), then the dashboard build in the directory
 `PORTFOLIO_UI_DIR` points at.
@@ -727,6 +803,9 @@ Deliberately not implemented, so that nobody goes looking for it in the code:
 | `fxRate` in the response | Contract decision 2 — the rate deliberately does not reach the JSON. |
 | Authentication inside the application | Cloudflare Access, see [Deployment](#deployment). |
 | Failover between Blockbook servers | An outage is an ordinary source failure: carry-forward and `stale=true`. |
+| Fill alerts over WebSocket | Polling every 45s is enough and far less code; see [Fill alerts](#fill-alerts-telegram). |
+| Funding, transfers and TWAP slice fills in the alerts | Separate `/info` endpoints, one request and one mapping each. |
+| Fill alerts for anything but Hyperliquid | There is no other exchange in this portfolio with an order API. |
 
 ### Testing
 
@@ -740,6 +819,17 @@ Deliberately not implemented, so that nobody goes looking for it in the code:
 - `PortfolioSnapshotPersistenceAdapterTest` — `@DataJpaTest`, because JPQL and snapshot replacement
   cannot be checked against a fake
 - `PortfolioControllerTest` — `@WebMvcTest` with the real service over a repository fake
+- `FillAlertServiceTest` — the three rules of [Fill alerts](#fill-alerts-telegram): a silent first
+  run, no repeat on the second, and the per-run cap; over `InMemoryTradeFillRepository`,
+  `FakeTradeFillSource` and `FakeNotificationPublisher` with a fixed `Clock`
+- `HyperliquidFillSourceTest`, `FillMessageFormatterTest` — `"@107"` resolution (including when
+  `spotMeta` fails) and the exact message text
+- `TradeFillPersistenceAdapterTest` — `@DataJpaTest`: `tid` really is the primary key, the cursor
+  is `max(fill_time)`
+- `FillAlertConfigTest` — the only test that loads `FillAlertConfig` at all, because the flag is
+  off in the test profile; no address is set, so the context comes up without one exchange call
+- `TelegramNotificationPublisherTest` — `MockRestServiceServer`: the token's colon survives the
+  URL, and a failed send never reaches the caller
 
 ## Source layout
 
@@ -764,5 +854,10 @@ The portfolio module lives in a `portfolio/` sub-package of each layer
 `adapter/outbound/persistence/portfolio`) plus `adapter/outbound/evm` and `adapter/outbound/cmc`.
 Its hand-run PostgreSQL schema is in `sql/portfolio_schema.sql`; the dashboard it feeds lives in
 a separate repository and is deployed next to the jar (see [UI](#ui)).
+
+The Telegram fill alerts follow the same shape in a `fill/` sub-package (`domain/model/fill`,
+`domain/port/fill`, `application/service/fill`, `adapter/outbound/persistence/fill`) and share
+`adapter/outbound/hyperliquid` with the portfolio — see [Fill alerts](#fill-alerts-telegram). Their
+only Spring entry points are `config/FillAlertConfig` and `adapter/inbound/FillAlertScheduler`.
 
 CSV historical data for backtests lives in `data/` (BTCUSDT, GOLD, USDPLN at H1/H4/D1/W1). Backtest output (Pine Script) goes to `output/`.
