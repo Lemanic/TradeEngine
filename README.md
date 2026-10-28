@@ -167,13 +167,13 @@ an order of the configured address fills — a spot buy or sell, a leveraged ope
 liquidation too. It reuses the portfolio's Hyperliquid connector, address and spot whitelist, so it
 needs **no new environment variable** and no key: the address goes in the request body.
 
-```
-🟢 HYPERLIQUID · Open Long          🔴 HYPERLIQUID · Reduce Long
-BTC  0.0123 @ 108450.5              BTC  0.0123 @ 109000
-Wartość: 1333.94 USD                Wartość: 1340.70 USD
-Prowizja: 0.47 USDC                 PnL: +6.73 USDC
-2026-10-27 14:32 UTC                2026-10-27 15:10 UTC
-```
+| Opening a position | Closing it |
+| --- | --- |
+| ![Hyperliquid open-long fill alert](assets/hyperliquid_fill_open.png) | ![Hyperliquid close-long fill alert](assets/hyperliquid_fill_close.png) |
+
+*Two real messages from the channel: an opening fill carries the fee, a closing one adds the
+realised PnL. The symbol is printed exactly as the exchange names that market — hence
+`xyz:GOOGL` rather than a ticker of our own.*
 
 The header is the API's own `dir` field, copied verbatim. There is **no branch for liquidation
 anywhere in the code** — an event nobody foresaw describes itself (`Liquidated Isolated Long`),
