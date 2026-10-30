@@ -51,6 +51,8 @@ public class PortfolioProperties {
 
     private Coinbase coinbase = new Coinbase();
 
+    private Near near = new Near();
+
     @Getter
     @Setter
     public static class Cmc {
@@ -207,6 +209,42 @@ public class PortfolioProperties {
     public static class AssetRef {
         private String asset;
         private Integer cmcId;
+    }
+
+    /**
+     * Staking natywny NEAR plus wolne saldo tego samego konta, czytane z lancucha.
+     *
+     * <p>Dwa hosty, bo to dwie rozne rzeczy: {@code api-base-url} odkrywa pule walidatorow,
+     * a {@code rpc-url} czyta salda. Oba publiczne i bez klucza, wiec jedyna wartosc
+     * przychodzaca z zewnatrz to {@code account-id}.
+     *
+     * <p>Liczby miejsc nie ma w konfiguracji: yoctoNEAR to 24 miejsca ustalone przez protokol,
+     * wiec stoi w {@code NearClient} jak {@code NATIVE_DECIMALS} w kliencie EVM. Blockbook ma
+     * je konfigurowalne tylko dlatego, ze obsluguje lancuchy o roznych jednostkach.
+     */
+    @Getter
+    @Setter
+    public static class Near {
+        /** JSON-RPC. UWAGA: NEAR zglasza bledy pod HTTP 200, w polu error. */
+        private String rpcUrl = "https://free.rpc.fastnear.com";
+        /** Odkrywanie pul walidatorow — inny host niz RPC. */
+        private String apiBaseUrl = "https://api.fastnear.com";
+        private Duration connectTimeout = Duration.ofSeconds(5);
+        private Duration readTimeout = Duration.ofSeconds(15);
+        /** Shown verbatim as {@code positions[].network}. */
+        private String network = "near";
+        private String asset = "NEAR";
+        private Integer cmcId = 6535;
+        private List<NearWallet> wallets = new ArrayList<>();
+    }
+
+    @Getter
+    @Setter
+    public static class NearWallet {
+        /** Display label; shares the namespace with every other source's label. */
+        private String label;
+        /** Konto NEAR — nazwane ({@code x.near}) albo niejawne, 64 znaki hex. */
+        private String accountId;
     }
 
     /** UTXO chains read from an xpub through a Blockbook server. */

@@ -9,6 +9,7 @@ import org.springframework.web.client.RestClient;
 import pl.tradeengine.adapter.outbound.blockbook.BlockbookClient;
 import pl.tradeengine.adapter.outbound.coinbase.CoinbaseClient;
 import pl.tradeengine.adapter.outbound.hyperliquid.HyperliquidClient;
+import pl.tradeengine.adapter.outbound.near.NearClient;
 import pl.tradeengine.adapter.outbound.evm.EvmBalanceClient;
 import pl.tradeengine.domain.model.portfolio.Holding;
 import pl.tradeengine.domain.port.portfolio.HoldingsSource;
@@ -39,6 +40,7 @@ class HoldingsSourceRegistryTest {
     private EvmBalanceClient client;
     private BlockbookClient blockbookClient;
     private HyperliquidClient hyperliquidClient;
+    private NearClient nearClient;
 
     @BeforeEach
     void setUp() {
@@ -47,6 +49,7 @@ class HoldingsSourceRegistryTest {
         client = new EvmBalanceClient(builder.build());
         blockbookClient = new BlockbookClient(builder.build(), "tradeengine/1.0");
         hyperliquidClient = new HyperliquidClient(builder.build());
+        nearClient = new NearClient(builder.build());
     }
 
     /**
@@ -102,7 +105,7 @@ class HoldingsSourceRegistryTest {
         properties.getBlockbook().setNetworks(Map.of("bitcoin", bitcoin));
         properties.getBlockbook().setWallets(xpubWallets);
 
-        return new HoldingsSourceRegistry(properties, client, blockbookClient, hyperliquidClient,
+        return new HoldingsSourceRegistry(properties, client, blockbookClient, hyperliquidClient, nearClient,
                 new NoCoinbase(), manualHoldings(properties), new NoBeanSources()).all();
     }
 
@@ -222,7 +225,7 @@ class HoldingsSourceRegistryTest {
     }
 
     private List<HoldingsSource> hyperliquidSources(PortfolioProperties properties) {
-        return new HoldingsSourceRegistry(properties, client, blockbookClient, hyperliquidClient,
+        return new HoldingsSourceRegistry(properties, client, blockbookClient, hyperliquidClient, nearClient,
                 new NoCoinbase(), manualHoldings(properties), new NoBeanSources()).all();
     }
 
@@ -247,6 +250,53 @@ class HoldingsSourceRegistryTest {
         assertThat(hyperliquidSources(new PortfolioProperties())).isEmpty();
     }
 
+    private static PortfolioProperties nearProperties(String label, String accountId) {
+        PortfolioProperties properties = new PortfolioProperties();
+        PortfolioProperties.NearWallet wallet = new PortfolioProperties.NearWallet();
+        wallet.setLabel(label);
+        wallet.setAccountId(accountId);
+        properties.getNear().setWallets(List.of(wallet));
+        return properties;
+    }
+
+    private List<HoldingsSource> nearSources(PortfolioProperties properties) {
+        return new HoldingsSourceRegistry(properties, client, blockbookClient, hyperliquidClient,
+                nearClient, new NoCoinbase(), manualHoldings(properties), new NoBeanSources()).all();
+    }
+
+    @Test
+    void buildsANearSourceOnOneNetwork() {
+        List<HoldingsSource> sources = nearSources(nearProperties("NEAR staking", "testonly.near"));
+
+        assertThat(sources).singleElement().satisfies(source -> {
+            assertThat(source.name()).isEqualTo("NEAR staking");
+            assertThat(source.networks()).containsExactly("near");
+        });
+    }
+
+    @Test
+    void skipsNearWithoutAnAccountId() {
+        assertThat(nearSources(nearProperties("NEAR staking", ""))).isEmpty();
+        assertThat(nearSources(nearProperties("NEAR staking", null))).isEmpty();
+    }
+
+    @Test
+    void readsADuplicatedNearAccountOnlyOnce() {
+        PortfolioProperties properties = nearProperties("NEAR staking", "testonly.near");
+        PortfolioProperties.NearWallet duplicate = new PortfolioProperties.NearWallet();
+        duplicate.setLabel("NEAR staking");
+        duplicate.setAccountId("TestOnly.near");
+        properties.getNear().setWallets(List.of(
+                properties.getNear().getWallets().get(0), duplicate));
+
+        assertThat(nearSources(properties)).hasSize(1);
+    }
+
+    @Test
+    void buildsNoNearSourceWhenNoAccountIsConfigured() {
+        assertThat(nearSources(new PortfolioProperties())).isEmpty();
+    }
+
     @Test
     void buildsManualSourcesGroupedByLabel() {
         PortfolioProperties properties = new PortfolioProperties();
@@ -255,8 +305,8 @@ class HoldingsSourceRegistryTest {
                 manualHolding("tao", "TAO staking", "bittensor", "TAO", 22974, "27.78")));
 
         List<HoldingsSource> sources = new HoldingsSourceRegistry(properties, client,
-                blockbookClient, hyperliquidClient, new NoCoinbase(), manualHoldings(properties),
-                new NoBeanSources()).all();
+                blockbookClient, hyperliquidClient, nearClient, new NoCoinbase(),
+                manualHoldings(properties), new NoBeanSources()).all();
 
         assertThat(sources).extracting(HoldingsSource::name)
                 .containsExactlyInAnyOrder("Trezor", "TAO staking");
@@ -274,8 +324,8 @@ class HoldingsSourceRegistryTest {
                 manualHolding("dubel", "Trezor", "bitcoin-cash", "BCH", 1831, "999")));
 
         List<HoldingsSource> sources = new HoldingsSourceRegistry(properties, client,
-                blockbookClient, hyperliquidClient, new NoCoinbase(), manualHoldings(properties),
-                new NoBeanSources()).all();
+                blockbookClient, hyperliquidClient, nearClient, new NoCoinbase(),
+                manualHoldings(properties), new NoBeanSources()).all();
 
         assertThat(sources).singleElement().satisfies(source ->
                 assertThat(source.fetchHoldings()).singleElement().satisfies(holding ->

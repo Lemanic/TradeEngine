@@ -12,6 +12,7 @@ import pl.tradeengine.adapter.outbound.cmc.CoinMarketCapPriceProvider;
 import pl.tradeengine.adapter.outbound.coinbase.CoinbaseClient;
 import pl.tradeengine.adapter.outbound.coinbase.CoinbaseJwt;
 import pl.tradeengine.adapter.outbound.hyperliquid.HyperliquidClient;
+import pl.tradeengine.adapter.outbound.near.NearClient;
 import pl.tradeengine.adapter.outbound.evm.EvmBalanceClient;
 import pl.tradeengine.application.service.portfolio.ManualHoldingService;
 import pl.tradeengine.application.service.portfolio.PortfolioQueryService;
@@ -81,6 +82,15 @@ public class PortfolioConfig {
         return new HyperliquidClient(RestClient.builder()
                 .requestFactory(requestFactory(
                         hyperliquid.getConnectTimeout(), hyperliquid.getReadTimeout()))
+                .build());
+    }
+
+    /** No {@code baseUrl}: pool discovery and the JSON-RPC calls sit on two different hosts. */
+    @Bean
+    public NearClient nearClient(PortfolioProperties properties) {
+        PortfolioProperties.Near near = properties.getNear();
+        return new NearClient(RestClient.builder()
+                .requestFactory(requestFactory(near.getConnectTimeout(), near.getReadTimeout()))
                 .build());
     }
 
