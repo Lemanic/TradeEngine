@@ -12,6 +12,8 @@ import pl.tradeengine.adapter.outbound.evm.EvmBalanceClient;
 import pl.tradeengine.adapter.outbound.hyperliquid.HyperliquidClient;
 import pl.tradeengine.adapter.outbound.hyperliquid.HyperliquidHoldingsSource;
 import pl.tradeengine.adapter.outbound.manual.ManualHoldingsSource;
+import pl.tradeengine.adapter.outbound.near.NearClient;
+import pl.tradeengine.adapter.outbound.near.NearHoldingsSource;
 import pl.tradeengine.application.service.portfolio.ManualHoldingService;
 import pl.tradeengine.adapter.outbound.evm.EvmHoldingsSource;
 import pl.tradeengine.domain.port.portfolio.HoldingsSource;
@@ -47,6 +49,7 @@ public class HoldingsSourceRegistry {
                                   EvmBalanceClient evmBalanceClient,
                                   BlockbookClient blockbookClient,
                                   HyperliquidClient hyperliquidClient,
+                                  NearClient nearClient,
                                   ObjectProvider<CoinbaseClient> coinbaseClient,
                                   ManualHoldingService manualHoldingService,
                                   ObjectProvider<HoldingsSource> beanSources) {
@@ -55,6 +58,7 @@ public class HoldingsSourceRegistry {
         all.addAll(hyperliquidSources(properties.getHyperliquid(), hyperliquidClient));
         all.addAll(manualSources(manualHoldingService));
         all.addAll(coinbaseSources(properties.getCoinbase(), coinbaseClient.getIfAvailable()));
+        all.addAll(nearSources(properties.getNear(), nearClient));
         beanSources.orderedStream().forEach(all::add);
         this.sources = List.copyOf(all);
 
@@ -246,6 +250,56 @@ public class HoldingsSourceRegistry {
             sources.add(new HyperliquidHoldingsSource(
                     wallet.getLabel(), config.getNetwork(), config.getBaseUrl(),
                     wallet.getAddress(), spotTokens, perps, staking, client));
+        }
+        return sources;
+    }
+
+    /**
+     * One source per NEAR account: its staking pools and its liquid balance on one network.
+     *
+     * <p>The validator pools are discovered at snapshot time, not configured, so switching
+     * validators needs no change here. What does come from configuration is only the account id.
+     */
+    private static List<HoldingsSource> nearSources(PortfolioProperties.Near near, NearClient client) {
+        if (near.getWallets().isEmpty()) {
+            return List.of();
+        }
+        if (isBlank(near.getRpcUrl()) || isBlank(near.getApiBaseUrl())) {
+            log.warn("portfolio.near needs rpc-url and api-base-url — skipped");
+            return List.of();
+        }
+        if (isBlank(near.getNetwork()) || isBlank(near.getAsset()) || near.getCmcId() == null) {
+            log.warn("portfolio.near needs network, asset and cmc-id — skipped");
+            return List.of();
+        }
+
+        List<HoldingsSource> sources = new ArrayList<>();
+        Set<String> seenAccounts = new HashSet<>();
+        for (PortfolioProperties.NearWallet wallet : near.getWallets()) {
+            if (isBlank(wallet.getLabel())) {
+                log.warn("portfolio.near.wallets has an entry without a label — skipped");
+                continue;
+            }
+            if (isBlank(wallet.getAccountId())) {
+                log.warn("NEAR wallet '{}' has no account-id configured — skipped "
+                        + "(is its env var set?)", wallet.getLabel());
+                continue;
+            }
+            // The account id stays out of the log, so the duplicate is reported by its label.
+            if (!seenAccounts.add(wallet.getAccountId().toLowerCase())) {
+                log.warn("The same NEAR account is configured twice for '{}' — the duplicate is "
+                        + "skipped so its balance is not counted twice", wallet.getLabel());
+                continue;
+            }
+            sources.add(new NearHoldingsSource(
+                    wallet.getLabel(),
+                    near.getNetwork(),
+                    near.getRpcUrl(),
+                    near.getApiBaseUrl(),
+                    wallet.getAccountId(),
+                    near.getAsset(),
+                    near.getCmcId(),
+                    client));
         }
         return sources;
     }

@@ -222,25 +222,32 @@ So past four sources, repainting the hexes **will not help**: you have to either
 of series (fold them into "Other"), or split them across panels, or fix the slice order. That
 changes how the chart is read, so it is **the user's decision**, neither ours nor theirs.
 
-As of today: **six sources** — `Rabby`, `Trezor`, `Hyperliquid`, `Coinbase`, `TAO staking`,
-`TRB staking`. `Coinbase` is the one that arrived last; the five before it were everything this
-note described earlier. With slices sorted by value this is past the range in which **any choice of
-colors from the documented eight passes the checks in both themes** — already at five none of the
-56 subsets passed, and a sixth slice only adds pairs that can touch. The donut works and every
-slice is labelled, but the contrast threshold is exceeded for some pair of neighbours.
+As of today: **seven sources** — `Rabby`, `Trezor`, `Hyperliquid`, `Coinbase`, `TAO staking`,
+`TRB staking`, `NEAR staking`. `NEAR staking` is the one that arrived last; the six before it were
+everything this note described earlier. With slices sorted by value this is past the range in which
+**any choice of colors from the documented eight passes the checks in both themes** — already at
+five none of the 56 subsets passed, and every further slice only adds pairs that can touch. The
+donut works and every slice is labelled, but the contrast threshold is exceeded for some pair of
+neighbours.
+
+Seven is also past the **fixed-order** check, which stopped at six. So the one option that used to
+need nothing but a reordering is no longer measured either, and `NEAR staking` needs a palette
+entry on the dashboard side regardless: `sources[].name` is the stable key a color is bound to.
 
 The fix lies **neither in the backend nor in the palette**: either fold the smallest sources into
 "Other", or split them across panels, or fix the slice order. Fixing the order is the one option
-that needs nothing else — the current palette was measured as passing every check at six sources in
-a fixed order, which is exactly where the portfolio now stands. This is the user's decision about
-how his own chart is read — it is waiting for him.
+that needs least — the current palette was measured as passing every check at six sources in a
+fixed order, one short of where the portfolio now stands. This is the user's decision about how his
+own chart is read — it is waiting for him.
 
 Observed on the dashboard on 2026-10-27, with amounts masked: six slices at 44.0 / 36.8 / 10.5 /
 3.1 / 3.1 / 2.4 percent — so the two smallest are the obvious candidates for "Other" if that is the
-route chosen.
+route chosen. `NEAR staking`, added 2026-10-30, came in at **0.16 percent**, well below all of
+them, which makes it the first candidate of all.
 
-A **seventh** source goes beyond everything measured: six is where the fixed-order check stops, so
-adding one means asking the dashboard side to re-run the validator rather than assuming it fits.
+An **eighth** source would exhaust the documented palette outright: eight colors, eight series, no
+subset left to choose from. Before adding one, ask the dashboard side to re-run the validator
+rather than assuming it fits.
 
 ### Degradation rules
 
@@ -295,6 +302,7 @@ warning in the log, never a startup failure.
 | `CMC_API_KEY` | CoinMarketCap key. Without it a snapshot logs an error and stores nothing. |
 | `PORTFOLIO_RABBY_ADDRESS` | EVM address for the `Rabby` label (ethereum, arbitrum). |
 | `PORTFOLIO_TREZOR_EVM_ADDRESS` | EVM address for the `Trezor` label (bsc). |
+| `PORTFOLIO_NEAR_ACCOUNT_ID` | NEAR account for the `NEAR staking` label — named (`x.near`) or implicit 64-hex. Read from the chain, so it never needs refreshing. |
 | `PORTFOLIO_TREZOR_BTC_XPUB` | BTC extended public key for `Trezor` (zpub, BIP84). |
 | `PORTFOLIO_TREZOR_BCH_XPUB` | BCH account key (xpub, BIP44 — **a different path than BTC**). Dormant today, Blockbook hosts return 403. |
 | `PORTFOLIO_TREZOR_BCH_AMOUNT` | BCH amount entered by hand, as long as reading it from the xpub is impossible. Zero it out when enabling the xpub. **Read only on the first startup** — the database rules afterwards, see [Manual amounts](#manual-amounts). |
@@ -341,6 +349,7 @@ verified on-chain via `symbol()`/`decimals()`, ids via CoinMarketCap:
 | bitcoin | BTC from an xpub via Blockbook | 1 |
 | hyperliquid | spot, perps equity and staking; separate `Hyperliquid` source | 3408, 34332, 32196, 1027, 1, 34466 |
 | coinbase | exchange balances via CDP, whitelist with `min-amount` against dust | 3408, 3773, 13502, 1, 1027 |
+| near | native NEAR: staking pools plus the liquid balance, one position | 6535 |
 | bittensor, ethereum (staking) | `TAO staking`, `TRB staking` — amounts entered by hand | 22974, 4944 |
 
 Adding an EVM token is **one line of YAML, no code and no schema redeploy**. Follow this procedure
@@ -575,6 +584,63 @@ carry-forward and `stale=true`, with the snapshot `complete=false`. The options 
 wait (the host worked before), point `base-url` at another Blockbook instance (but an xpub reveals
 the whole wallet, so that is a trust decision), or run your own instance.
 
+#### NEAR (native staking)
+
+`portfolio.near` reads one account's whole NEAR position: everything delegated to validators plus
+the liquid balance, summed into **one** `Holding`. Two public, keyless hosts, which is why the
+client carries no `baseUrl`: `api-base-url` (FastNEAR) discovers the pools, `rpc-url` (any NEAR RPC
+provider) reads the balances.
+
+This is read from the chain rather than entered by hand on purpose. A staking pool books each
+epoch's rewards by **raising the price of a stake share**, so the delegator's balance compounds
+with no action — a manual amount would start understating the position the moment it was typed,
+exactly the way `TAO staking` and `TRB staking` do. The difference is that this number is readable.
+
+Three things verified against mainnet that no response shape reveals:
+
+- **NEAR reports failures under HTTP 200.** An unknown account answers `200` with a populated
+  `error` (`cause.name = UNKNOWN_ACCOUNT`); a missing view method answers `200`, an **empty
+  top-level `error`**, and the real failure one level down, *inside* `result`. Both fields are
+  checked on every call — status-based handling alone reads either as a successful empty answer.
+- **A view call's payload is a JSON array of byte values** (`[34,51,...]`), not a string: decode to
+  UTF-8 first, then parse, because a `U128` comes back quoted.
+- **Pool discovery lists pools the account has left.** Verified: such a pool reports
+  `last_update_block_height: null` and answers `get_account_staked_balance` with `"0"`. The zero is
+  what drops it — the block height is not used as a filter, because only the balance is conclusive.
+
+`decimals` is deliberately **not** configurable: yoctoNEAR is 24 places fixed by the protocol, so it
+sits in `NearClient.YOCTO_DECIMALS` the way `NATIVE_DECIMALS` does in the EVM client. Blockbook has
+it in YAML only because it serves chains with different units.
+
+**One unreadable pool fails the whole source**, rather than contributing a zero. A partial sum
+would quietly understate the portfolio and look like a real drop on the chart; the exception hands
+the job to carry-forward instead — previous amount, today's prices, `stale=true`, snapshot
+incomplete.
+
+Pointing `rpc-url` at a dead host confirmed the first half of that live: the source failed, the
+snapshot came back `complete: false`, and the service logged its attempt to fall back. The carry
+itself could not be shown that way and is pinned by `PortfolioSnapshotServiceTest` instead —
+**a devtools restart re-runs `ddl-auto: create`, which empties the in-memory H2**, so after
+changing the config there is never a previous snapshot left to carry from. Worth knowing before
+trying to reproduce any carry-forward behaviour by hand in dev.
+
+Pools are discovered per snapshot, so **changing validator needs no configuration change**. What is
+configured is only the account id, and it is the sole value from outside. The account id stays out
+of every message and log line: it is not a secret the way an xpub is, but it ties the owner to an
+on-chain identity, so the discovery error drops its cause (the URL carries the id) while the RPC
+error keeps it (the id travels in the body).
+
+Rate limits are a non-issue: one discovery call plus one per pool plus one `view_account`, so three
+requests an hour for this portfolio. `free.rpc.fastnear.com` publishes no limit; `rpc-url` is
+configuration, so swapping in dRPC, Lava or BlockPI is one line. There is deliberately no failover
+— an outage is an ordinary source failure, the same decision as for Blockbook.
+
+What it deliberately does not read: `unstaked_balance` (NEAR in the 2-3 day unbonding window) and
+liquid-staking receipts such as Meta Pool's stNEAR. The first is one field away if it is ever
+wanted — switch the view method to `get_account`, which returns staked, unstaked and
+`can_withdraw` in the same single call. On this account it stands at 1 yoctoNEAR, i.e. rounding
+dust. The second is an ordinary FT balance, not staking, and would need a token read instead.
+
 ### Database
 
 Prod runs with `ddl-auto: validate`, so the tables have to exist **before** startup:
@@ -798,6 +864,7 @@ Deliberately not implemented, so that nobody goes looking for it in the code:
 | --- | --- |
 | A UI form for manual positions | The backend has `GET` and `PUT /api/portfolio/manual-holdings`; the dashboard does not show them. Amounts are changed with curl, see [API](#api). |
 | Adding and removing manual positions through the API | Deliberate: `PUT` changes the amount only. A new position means an entry in `portfolio.manual.holdings` and a restart. |
+| `unstaked_balance` and stNEAR on NEAR | See [NEAR](#near-native-staking) — the first is a one-field change, the second is an FT balance, not staking. |
 | BCH via xpub | The infrastructure is ready: add the `bitcoin-cash` network (`base-url: https://bch1.trezor.io`, `cmc-id: 1831`, `decimals: 8`) and a wallet entry with the `Trezor` label. |
 | BTC outside the xpub (e.g. a second wallet) | As above, another entry in `portfolio.blockbook.wallets`. |
 | `fxRate` in the response | Contract decision 2 — the rate deliberately does not reach the JSON. |
@@ -816,6 +883,9 @@ Deliberately not implemented, so that nobody goes looking for it in the code:
 - `EvmBalanceClientTest`, `CoinMarketCapPriceProviderTest`, `BlockbookClientTest` —
   `MockRestServiceServer`; in tests use a fake xpub, never a real one
 - `HoldingsSourceRegistryTest` — including a label spanning EVM and an xpub
+- `NearClientTest`, `NearHoldingsSourceTest` — the three traps of [NEAR](#near-native-staking):
+  an error under HTTP 200 at both depths, the byte-array payload, and a left-behind pool; plus
+  that one unreadable pool fails the whole source instead of summing partially
 - `PortfolioSnapshotPersistenceAdapterTest` — `@DataJpaTest`, because JPQL and snapshot replacement
   cannot be checked against a fake
 - `PortfolioControllerTest` — `@WebMvcTest` with the real service over a repository fake
@@ -851,7 +921,8 @@ src/main/java/pl/tradeengine/
 
 The portfolio module lives in a `portfolio/` sub-package of each layer
 (`domain/model/portfolio`, `domain/port/portfolio`, `application/service/portfolio`,
-`adapter/outbound/persistence/portfolio`) plus `adapter/outbound/evm` and `adapter/outbound/cmc`.
+`adapter/outbound/persistence/portfolio`) plus `adapter/outbound/evm`, `adapter/outbound/near` and
+`adapter/outbound/cmc`.
 Its hand-run PostgreSQL schema is in `sql/portfolio_schema.sql`; the dashboard it feeds lives in
 a separate repository and is deployed next to the jar (see [UI](#ui)).
 

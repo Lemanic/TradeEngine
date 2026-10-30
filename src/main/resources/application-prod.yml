@@ -169,6 +169,24 @@ portfolio:
       - label: "Trezor"
         xpub: ${PORTFOLIO_TREZOR_BCH_XPUB:}
         network: bitcoin-cash
+  # Staking natywny NEAR plus wolne saldo tego samego konta (portfel Meteor).
+  # Pule walidatorow odkrywamy same, wiec zmiana walidatora nie wymaga zmiany konfiguracji;
+  # odkrywanie zwraca tez pule historyczne, a te oddaja zero i wypadaja na saldzie.
+  # Nagrody auto-kompounduja sie w saldzie puli, wiec ta liczba nie starzeje sie jak TAO/TRB.
+  near:
+    # JSON-RPC, bez klucza. UWAGA: NEAR zglasza bledy pod HTTP 200, w polu error.
+    rpc-url: https://free.rpc.fastnear.com
+    # Odkrywanie pul walidatorow — inny host niz RPC.
+    api-base-url: https://api.fastnear.com
+    connect-timeout: 5s
+    read-timeout: 15s
+    network: near
+    asset: NEAR
+    cmc-id: 6535
+    # Jedno konto, jedna etykieta. 24 miejsca yoctoNEAR siedza w kodzie, nie tutaj.
+    wallets:
+      - label: "NEAR staking"
+        account-id: ${PORTFOLIO_NEAR_ACCOUNT_ID:}
   evm:
     connect-timeout: 5s
     read-timeout: 15s
