@@ -109,10 +109,39 @@ The engine is **symbol-agnostic** — a symbol is whatever code the alert carrie
 
 ### 🔁 Backtesting
 
-`BacktestApplication` is a plain `main` with no Spring context: it instantiates the Grinder
-scenarios directly, backs them with in-memory repositories, replays CSV candles from `data/`
-(BTCUSDT, GOLD, USDPLN at H1/H4/D1/W1) and synthesizes the same domain events the webhook flow
-produces. Output is Pine Script written to `output/`, to be overlaid back on the chart.
+Two plain `main`s with no Spring context replay CSV candles from `data/` (BTC, TAO, GOLD, USDPLN),
+back the real scenarios with in-memory repositories and synthesize the same domain events the
+webhook flow produces. Output is Pine Script written to `output/`, to be overlaid back on the chart.
+
+- `BacktestApplication` runs both Grinder scenarios.
+- `DoubleDivergenceBacktest [timeframe] [asset]` runs the double-divergence strategy on one
+  timeframe. Divergences are recomputed from the candles by a 1:1 port of the VuManChu Cipher B
+  WaveTrend divergence logic, the indicator that produces the live alerts.
+
+The loader takes TradingView CSV exports as they come (UNIX time, extra columns) and drops the
+last bar if it has not closed yet.
+
+#### Example output: double divergence, BTC H4
+
+![Double-divergence signals on BTC H4, Aug–Oct 2025](assets/double_divergence_btc_h4.png)
+
+*`DOUBLE_DIVERGENCE_STRATEGY` on H4, where a signal needs a **second** divergence in the same
+direction within 35 candles (a single one is enough only on H12/D1). Aug 19 – Oct 16, 2025: 9 of
+the 54 signals exported since July 2022. ▲ long, ▼ short. Each marker sits on the bar that opens
+when the live alert would have fired.*
+
+Measured 5 days (30 H4 bars) from each signal's open:
+
+- **The reversals are the clean calls.** The long on Sep 26 at ~109.2k was up 7.5%, at the start
+  of the run to 126k. The short on Oct 5 at ~122.7k was up 4.8%, ahead of the Oct 10 sell-off.
+- **The failures are counter-trend clusters.** The two shorts on Sep 9 (~113.0k and ~111.3k) lost
+  2.5% and 3.9% as the September rally kept going. The strategy has no trend filter, so stacked
+  bearish divergences inside a strong uptrend still fire.
+- **5 of the 9 signals were in profit after 5 days.** Nine signals illustrate the behaviour; they
+  are not a statistic.
+
+Next step: forward returns for all 54 signals, then a test of whether a D1/W1 bias gate (the one
+Grinder already uses) removes the counter-trend shorts without losing the reversals.
 
 ## 📸 Live Signal Example
 
@@ -271,7 +300,7 @@ The project is continuously evolving from a signal provider into a full-stack tr
 - [ ] **Trade Management:** Logic for Breakeven triggers, Trailing Stops, and Partial Take Profits.
 
 ### 🔹 Strategies & Backtesting
-- [x] **Backtesting Engine:** Standalone runner over historical CSV candles with Pine Script export — see [Backtesting](#-backtesting). Covers the Grinder scenarios; the Spring-only strategies have no backtest path yet.
+- [x] **Backtesting Engine:** Standalone runner over historical CSV candles with Pine Script export — see [Backtesting](#-backtesting). Covers the Grinder scenarios and the double-divergence strategy; the two FVG strategies have no backtest path yet.
 - [ ] **Strategy Versioning:** Mechanism to manage multiple versions of strategy logic (e.g., `v1.0` vs `v1.2`) simultaneously.
 - [x] **Strategy Enablement from Configuration:** `app.strategies` decides which strategies run and on which timeframes, without a redeploy.
 - [ ] **Dynamic Parameterization:** Thresholds themselves (lookback windows, minimum divergence counts, FVG timing constants) are still compile-time constants and should move to configuration.
