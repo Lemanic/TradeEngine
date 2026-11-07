@@ -109,39 +109,81 @@ The engine is **symbol-agnostic** — a symbol is whatever code the alert carrie
 
 ### 🔁 Backtesting
 
-Two plain `main`s with no Spring context replay CSV candles from `data/` (BTC, TAO, GOLD, USDPLN),
-back the real scenarios with in-memory repositories and synthesize the same domain events the
-webhook flow produces. Output is Pine Script written to `output/`, to be overlaid back on the chart.
+Two plain `main`s with no Spring context replay CSV candles from `data/` (BTC, TAO, NASDAQ, GOLD,
+USDPLN), back the real scenarios with in-memory repositories and synthesize the same domain events
+the webhook flow produces. Output is Pine Script written to `output/`, to be overlaid back on the
+chart.
 
 - `BacktestApplication` runs both Grinder scenarios.
 - `DoubleDivergenceBacktest [timeframe] [asset]` runs the double-divergence strategy on one
   timeframe. Divergences are recomputed from the candles by a 1:1 port of the VuManChu Cipher B
   WaveTrend divergence logic, the indicator that produces the live alerts.
+- `scripts/forward_returns.py <csv> <pine> <bar-hours>` measures what the exported signals did
+  next, against random entries (see below).
 
 The loader takes TradingView CSV exports as they come (UNIX time, extra columns) and drops the
 last bar if it has not closed yet.
 
-#### Example output: double divergence, BTC H4
+The trigger depends on the timeframe: up to H8 a signal needs a **second** divergence in the same
+direction within 35 candles, on H12 and D1 a **single** one is enough.
+
+#### Example output: BTC H4 and TAO H1 / H12
 
 ![Double-divergence signals on BTC H4, Aug–Oct 2025](assets/double_divergence_btc_h4.png)
 
-*`DOUBLE_DIVERGENCE_STRATEGY` on H4, where a signal needs a **second** divergence in the same
-direction within 35 candles (a single one is enough only on H12/D1). Aug 19 – Oct 16, 2025: 9 of
-the 54 signals exported since July 2022. ▲ long, ▼ short. Each marker sits on the bar that opens
-when the live alert would have fired.*
+*BTC H4, two divergences required. Aug 19 – Oct 16, 2025: 9 of the 54 signals exported since July
+2022. ▲ long, ▼ short. Each marker sits on the bar that opens when the live alert would have
+fired.* The long on Sep 26 at ~109.2k was up 7.5% five days later, at the start of the run to
+126k. The two shorts on Sep 9 lost 2.5% and 3.9% as the September rally kept going.
 
-Measured 5 days (30 H4 bars) from each signal's open:
+![Double-divergence signals on TAO H1, Aug–Sep 2026](assets/double_divergence_tao_h1.png)
 
-- **The reversals are the clean calls.** The long on Sep 26 at ~109.2k was up 7.5%, at the start
-  of the run to 126k. The short on Oct 5 at ~122.7k was up 4.8%, ahead of the Oct 10 sell-off.
-- **The failures are counter-trend clusters.** The two shorts on Sep 9 (~113.0k and ~111.3k) lost
-  2.5% and 3.9% as the September rally kept going. The strategy has no trend filter, so stacked
-  bearish divergences inside a strong uptrend still fire.
-- **5 of the 9 signals were in profit after 5 days.** Nine signals illustrate the behaviour; they
-  are not a statistic.
+*TAO H1, two divergences required. Aug 17 – Sep 24, 2026, out of 207 signals since January 2024.*
 
-Next step: forward returns for all 54 signals, then a test of whether a D1/W1 bias gate (the one
-Grinder already uses) removes the counter-trend shorts without losing the reversals.
+![Single-divergence signals on TAO H12, Dec 2025 – Oct 2026](assets/double_divergence_tao_h12.png)
+
+*TAO H12, one divergence is enough. Dec 2025 – Oct 2026, out of 54 signals since April 2023.*
+
+By eye, H12 looks like the cleaner of the two: fewer markers, several of them on the major turns
+(the February low, the March and May tops). **Measuring every signal did not confirm that.**
+
+#### Measured: forward returns of every exported signal
+
+Entry at the open of the signal bar, exit at the close N bars later, return signed by direction,
+no fees. The baseline puts each signal, with its own direction, on a random bar of the same
+period (2000 runs). `p` is the share of random runs that did at least as well as the signals.
+
+| Instrument | TF | Trigger | Signals | Period | Mean, 3 days | Mean, 5 days | Mean, 10 days | Random, 5 days | p, 5 days |
+| --- | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| BTC | H4 | 2+ divergences | 54 | 2022-07 – 2026-01 | −0.19% | +0.55% | +0.90% | −0.22% | 0.15 |
+| TAO | H1 | 2+ divergences | 207 | 2024-01 – 2026-11 | +1.04% | +0.97% | +0.58% | +0.03% | 0.15 |
+| TAO | H12 | 1 divergence | 54 | 2023-04 – 2026-11 | −1.75% | −1.43% | −2.31% | +0.21% | 0.80 |
+
+What the numbers say:
+
+- **No configuration has a demonstrated edge.** The best p-value is 0.07 (TAO H1 at 3 days), at
+  54–207 signals, before costs. And it is optimistic: clustered divergences fire on neighbouring
+  bars, so the signals are not independent.
+- **The visual review was wrong about H12.** Its signals did *worse* than random entries, and the
+  cause is one-sided: H12 longs made +1.8% in five days, H12 shorts lost 5.5% (−9.5% at ten
+  days). Picking out the well-placed markers by eye hid that.
+- **Shorts are the weak side everywhere.** At five days the short side averages +0.18% on BTC H4
+  and +0.03% on TAO H1, against +1.30% and +1.78% for the longs. That matches the losing trades on
+  the charts: shorts fired into a rising market.
+
+H1 and H12 differ in **three** things at once: timeframe, trigger threshold and the period the
+data covers (H1 starts in January 2024, H12 in April 2023). The difference between them therefore
+cannot be pinned on any one of these.
+
+Next steps, one variable at a time:
+
+1. H12 with two divergences required, on the same dates as now: the effect of the threshold.
+2. H1 with a single divergence, cut to the same dates as H12: the effect of the timeframe.
+3. Long-only, and a D1/W1 bias gate on shorts (the one Grinder already uses). The short side is weakest in all
+   three runs and does no better than flat on BTC H4 and TAO H1, so the filter is where an edge is
+   most likely to come from.
+4. NASDAQ H1–D1 is already exported (`data/nasdaq_*.csv`) and is the out-of-sample check: an
+   instrument that took no part in choosing the rules.
 
 ## 📸 Live Signal Example
 
