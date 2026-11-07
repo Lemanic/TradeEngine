@@ -18,7 +18,9 @@ Run the backtest first: output/ is not in git.
 
 Output: one header line (signal count and date range), then one line per horizon (1, 3, 5, 10
 days) with the number of usable signals, mean signed return, hit rate, the random baseline's
-mean, p, and the mean split into LONG and SHORT signals.
+mean, p, and the mean split into LONG and SHORT signals. Then an "exits" block, one line per
+horizon: the unsigned price move after SHORT signals next to the average move of any window of
+that length in the same period (the market drift a random exit would give up). No p-value there.
 
 Standard library only. The random baseline is seeded with SEED (1), so every run prints the same
 p-values.
@@ -87,6 +89,16 @@ def main(csv_path, pine_path, bar_hours):
               f" mean {mean * 100:+6.2f}%  hit {sum(r > 0 for r in rets) / len(rets):4.0%}"
               f"  random {st.mean(baseline) * 100:+6.2f}%  p={p:.2f}"
               f"  | LONG {st.mean(by_dir[1]) * 100:+6.2f}%  SHORT {st.mean(by_dir[-1]) * 100:+6.2f}%")
+
+    # ▼ signals read as exits: raw price move after them against the market's drift, i.e. the
+    # mean move of every window of the same length over the baseline's pool of bars.
+    print("exits: price move after a SHORT signal vs an average window")
+    for days in HORIZONS_DAYS:
+        n = round(days * 24 / bar_hours)
+        after = [signed_return(bars, i, n, 1) for i, d in signals if d == -1 and i + n < len(bars)]
+        drift = st.mean(signed_return(bars, i, n, 1) for i in range(first, len(bars) - n))
+        print(f"{days:>3}d ({n:>3} bars)  n={len(after):<4}"
+              f" after SHORT {st.mean(after) * 100:+6.2f}%  average window {drift * 100:+6.2f}%")
 
 
 if __name__ == "__main__":
