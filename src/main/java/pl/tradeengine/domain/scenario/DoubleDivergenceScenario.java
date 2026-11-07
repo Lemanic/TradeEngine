@@ -55,7 +55,10 @@ public class DoubleDivergenceScenario implements Scenario {
             return List.of(buildAlert(newDivergence, "SingleDiv", 1));
         }
 
-        ZonedDateTime lookbackTime = calculateLookbackTime(newDivergence.getTimeframe(), CANDLE_LOOKBACK_WINDOW);
+        // Anchored to the signal, not to the clock: live they are the same moment, and a backtest
+        // replaying history has no meaningful "now".
+        ZonedDateTime lookbackTime = calculateLookbackTime(
+                newDivergence.getDetectedAt(), newDivergence.getTimeframe(), CANDLE_LOOKBACK_WINDOW);
 
         List<DivergenceSignal> recentDivergences = divergenceRepository.findAllByDirectionSince(
                 newDivergence.getSymbol(),
@@ -93,7 +96,7 @@ public class DoubleDivergenceScenario implements Scenario {
                 Optional.empty(),
                 Optional.empty(),
                 description,
-                ZonedDateTime.now()
+                divergence.getDetectedAt()
         );
     }
 
@@ -102,9 +105,9 @@ public class DoubleDivergenceScenario implements Scenario {
         return 0L;
     }
 
-    private ZonedDateTime calculateLookbackTime(Timeframe timeframe, int numberOfCandles) {
+    private ZonedDateTime calculateLookbackTime(ZonedDateTime detectedAt, Timeframe timeframe, int numberOfCandles) {
         Duration totalLookback = timeframe.getDuration().multipliedBy(numberOfCandles);
-        return ZonedDateTime.now().minus(totalLookback);
+        return detectedAt.minus(totalLookback);
     }
 
 }

@@ -10,6 +10,8 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.time.ZoneOffset;
@@ -21,6 +23,17 @@ import java.util.List;
 public class HistoricalCandleLoader {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+    private final Clock clock;
+
+    public HistoricalCandleLoader() {
+        this(Clock.systemUTC());
+    }
+
+    /** The clock decides which candles are still forming; injectable so a test can pin it. */
+    public HistoricalCandleLoader(Clock clock) {
+        this.clock = clock;
+    }
 
     public List<PriceCandle> loadFromCsv(Path csvPath, Symbol symbol, Timeframe timeframe) throws IOException {
         List<PriceCandle> candles = new ArrayList<>();
@@ -40,6 +53,13 @@ public class HistoricalCandleLoader {
                 lineNumber++;
                 try {
                     PriceCandle candle = parseLine(line, symbol, timeframe);
+                    // A TradingView export always ends with the bar that is still forming. Replaying
+                    // it as closed would let an unfinished high/low/close confirm a signal.
+                    if (candle.closeTime().toInstant().isAfter(clock.instant())) {
+                        log.info("Skipping unclosed candle {} {} opened at {}",
+                                symbol.code(), timeframe, candle.openTime());
+                        continue;
+                    }
                     candles.add(candle);
                 } catch (Exception e) {
                     log.warn("Failed to parse line {}: {} - Error: {}", lineNumber, line, e.getMessage());
@@ -54,14 +74,18 @@ public class HistoricalCandleLoader {
     private PriceCandle parseLine(String line, Symbol symbol, Timeframe timeframe) {
         String[] parts = line.split(",");
 
-        if (parts.length != 5) {
-            throw new IllegalArgumentException("Expected 5 columns, got " + parts.length);
+        // TradingView exports append Volume and one column per visible indicator; only OHLC matters.
+        if (parts.length < 5) {
+            throw new IllegalArgumentException("Expected at least 5 columns, got " + parts.length);
         }
 
         String dateStr = parts[0].trim();
         ZonedDateTime openTime;
 
-        try {
+        if (dateStr.matches("\\d+")) {
+            // TradingView "UNIX timestamp" export: seconds since epoch.
+            openTime = Instant.ofEpochSecond(Long.parseLong(dateStr)).atZone(ZoneOffset.UTC);
+        } else try {
             openTime = ZonedDateTime.parse(dateStr);
         } catch (Exception e) {
             LocalDate date = LocalDate.parse(dateStr, DATE_FORMATTER);
