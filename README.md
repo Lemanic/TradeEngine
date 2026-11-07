@@ -132,7 +132,7 @@ direction within 35 candles, on H12 and D1 a **single** one is enough.
 ![Double-divergence signals on BTC H4, Aug–Oct 2025](assets/double_divergence_btc_h4.png)
 
 *BTC H4, two divergences required. Aug 19 – Oct 16, 2025: 9 of the 54 signals exported since July
-2022. ▲ long, ▼ short. Each marker sits on the bar that opens when the live alert would have
+2022. ▲ bullish, ▼ bearish (a short entry, or a cue to close or trim a long). Each marker sits on the bar that opens when the live alert would have
 fired.* The long on Sep 26 at ~109.2k was up 7.5% five days later, at the start of the run to
 126k. The two shorts on Sep 9 lost 2.5% and 3.9% as the September rally kept going.
 
@@ -161,15 +161,22 @@ period (2000 runs). `p` is the share of random runs that did at least as well as
 
 What the numbers say:
 
-- **No configuration has a demonstrated edge.** The best p-value is 0.07 (TAO H1 at 3 days), at
-  54–207 signals, before costs. And it is optimistic: clustered divergences fire on neighbouring
-  bars, so the signals are not independent.
+- **No configuration has a demonstrated edge.** At five days the lowest p-value is 0.15. The best
+  value overall, 0.07 (TAO H1 at 3 days), is the best of twelve tests (three configurations × four
+  horizons, the script also checks 1 day), so it is weaker than it looks. It is also optimistic: clustered divergences fire on
+  neighbouring bars, so the signals are not independent.
 - **The visual review was wrong about H12.** Its signals did *worse* than random entries, and the
   cause is one-sided: H12 longs made +1.8% in five days, H12 shorts lost 5.5% (−9.5% at ten
   days). Picking out the well-placed markers by eye hid that.
-- **Shorts are the weak side everywhere.** At five days the short side averages +0.18% on BTC H4
-  and +0.03% on TAO H1, against +1.30% and +1.78% for the longs. That matches the losing trades on
-  the charts: shorts fired into a rising market.
+- **As short entries, ▼ signals are the weak side everywhere.** At five days the short side
+  averages +0.18% on BTC H4 and +0.03% on TAO H1, against +1.30% and +1.78% for the longs. That
+  matches the losing trades on the charts: shorts fired into a rising market.
+- **As exits from a long, they look better, except on H12.** An exit has to beat leaving at a
+  random moment, which in a rising market costs the drift. Five days after a ▼ signal price moved
+  −0.18% on BTC H4 and −0.03% on TAO H1, against +0.70% and +0.57% for an average five-day window
+  in the same period: leaving on the signal avoided most of the move a random exit would have
+  given up. On TAO H12 price rose +5.5% after a ▼ signal, against +1.4% on average, so exiting
+  there gave up four times the usual gain. These exit figures carry no p-value yet.
 
 H1 and H12 differ in **three** things at once: timeframe, trigger threshold and the period the
 data covers (H1 starts in January 2024, H12 in April 2023). The difference between them therefore
@@ -179,8 +186,9 @@ Next steps, one variable at a time:
 
 1. H12 with two divergences required, on the same dates as now: the effect of the threshold.
 2. H1 with a single divergence, cut to the same dates as H12: the effect of the timeframe.
-3. Long-only, and a D1/W1 bias gate on shorts (the one Grinder already uses). The short side is weakest in all
-   three runs and does no better than flat on BTC H4 and TAO H1, so the filter is where an edge is
+3. Long-only, with ▼ markers tested as exits rather than entries (with their own random-exit
+   baseline and p-value), and a D1/W1 bias gate on the bearish side (the one Grinder already
+   uses). As shorts, the bearish side is weakest in all three runs, so that is where an edge is
    most likely to come from.
 4. NASDAQ H1–D1 is already exported (`data/nasdaq_*.csv`) and is the out-of-sample check: an
    instrument that took no part in choosing the rules.
