@@ -1,0 +1,2 @@
+# forward_returns.py uses the Python standard library only (tested with Python 3.12.10),
+# so there is nothing to install. Add pinned third-party packages here if that changes.
