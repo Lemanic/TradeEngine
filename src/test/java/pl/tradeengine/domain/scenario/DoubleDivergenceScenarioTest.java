@@ -27,8 +27,8 @@ class DoubleDivergenceScenarioTest {
         scenario = new DoubleDivergenceScenario(divergenceRepository);
     }
 
-    // The scenario derives its lookback window from ZonedDateTime.now(), so LTF fixtures
-    // have to be anchored to the real clock rather than to TestFixtures.FIXED_NOW.
+    // The lookback window is anchored to the new signal's detectedAt; fixtures use the real clock
+    // because that is what WebhookProcessingService stamps a live divergence with.
     private DivergenceSignal save(Timeframe tf, Direction direction, ZonedDateTime detectedAt) {
         return divergenceRepository.save(TestFixtures.divergence(tf, direction, detectedAt));
     }
