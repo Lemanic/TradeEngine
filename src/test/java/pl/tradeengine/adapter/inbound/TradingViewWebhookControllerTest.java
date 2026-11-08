@@ -118,21 +118,21 @@ class TradingViewWebhookControllerTest {
     @Test
     void unknownTimeframeIs400OnEveryEndpoint() throws Exception {
         mockMvc.perform(post("/webhooks/fvg").contentType(APPLICATION_JSON).content("""
-                        {"symbol":"BTCUSDT","timeframe":"M30","signalType":"FVG_BULLISH",
+                        {"symbol":"BTCUSDT","timeframe":"M45","signalType":"FVG_BULLISH",
                          "direction":"LONG","fvgLow":60000,"fvgHigh":61000,"fvgStatus":"CREATED"}"""))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(post("/webhooks/divergence").contentType(APPLICATION_JSON).content("""
-                        {"symbol":"BTCUSDT","timeframe":"M30","signalType":"DIVERGENCE","direction":"LONG"}"""))
+                        {"symbol":"BTCUSDT","timeframe":"M45","signalType":"DIVERGENCE","direction":"LONG"}"""))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(post("/webhooks/price").contentType(APPLICATION_JSON).content("""
-                        {"symbol":"BTCUSDT","timeframe":"M30","signalType":"PRICE_UPDATE",
+                        {"symbol":"BTCUSDT","timeframe":"M45","signalType":"PRICE_UPDATE",
                          "currentHigh":60800,"currentLow":60200,"close":60500}"""))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(post("/webhooks/momentum").contentType(APPLICATION_JSON).content("""
-                        {"symbol":"BTCUSDT","timeframe":"M30","signal":"MOMENTUM_WAVE","direction":"BULLISH"}"""))
+                        {"symbol":"BTCUSDT","timeframe":"M45","signal":"MOMENTUM_WAVE","direction":"BULLISH"}"""))
                 .andExpect(status().isBadRequest());
 
         // Nic nie poszlo dalej — 400 jest ostatnim slowem.

@@ -27,7 +27,7 @@ class TimeframeTest {
     @Test
     void shouldThrow_whenCodeIsUnknown() {
         // To jest dokladnie ta sciezka, ktora TradingViewWebhookController zamienia na 400.
-        assertThatThrownBy(() -> Timeframe.fromCode("M30"))
+        assertThatThrownBy(() -> Timeframe.fromCode("M45"))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> Timeframe.fromCode(null))
                 .isInstanceOf(NullPointerException.class);
@@ -39,6 +39,7 @@ class TimeframeTest {
         // liczone jako duration * N swiec sa dokladne i niezalezne od stref czasowych.
         assertThat(Timeframe.M1.getDuration()).isEqualTo(Duration.ofMinutes(1));
         assertThat(Timeframe.M15.getDuration()).isEqualTo(Duration.ofMinutes(15));
+        assertThat(Timeframe.M30.getDuration()).isEqualTo(Duration.ofMinutes(30));
         assertThat(Timeframe.H4.getDuration()).isEqualTo(Duration.ofHours(4));
         assertThat(Timeframe.H8.getDuration()).isEqualTo(Duration.ofHours(8));
         assertThat(Timeframe.D1.getDuration()).isEqualTo(Duration.ofDays(1));

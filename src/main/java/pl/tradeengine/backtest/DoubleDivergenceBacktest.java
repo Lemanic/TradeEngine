@@ -66,9 +66,8 @@ public class DoubleDivergenceBacktest {
             alerts.addAll(scenario.onEvent(new DivergenceDetectedEvent(saved)));
         }
 
-        // BTC keeps its original file names; other assets get their prefix.
-        String prefix = asset.equals("btc") ? "" : asset + "_";
-        String out = "output/" + prefix + "double_divergence_" + tf.name().toLowerCase(Locale.ROOT) + ".pine";
+        // Every asset gets its prefix, BTC included, so exports for different markets never share a name.
+        String out = "output/" + asset + "_double_divergence_" + tf.name().toLowerCase(Locale.ROOT) + ".pine";
         new TradingViewExporter().export(alerts, Paths.get(out), startDate, null);
 
         List<AlertToSend> inRange = alerts.stream().filter(a -> !a.getTimestamp().isBefore(startDate)).toList();
