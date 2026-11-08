@@ -99,7 +99,7 @@ class WebhookProcessingServiceHandleFvgTest {
 
     @Test
     void shouldThrowAndSaveNothing_whenTimeframeIsUnknown() {
-        FvgAlertDto dto = new FvgAlertDto(BTC.code(), "M30", "FVG_BULLISH", "LONG",
+        FvgAlertDto dto = new FvgAlertDto(BTC.code(), "M45", "FVG_BULLISH", "LONG",
                 new BigDecimal("60000"), new BigDecimal("61000"), "CREATED");
 
         assertThatThrownBy(() -> h.service.handleFvg(dto)).isInstanceOf(IllegalArgumentException.class);
