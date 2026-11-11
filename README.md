@@ -74,7 +74,7 @@ profile:
 
 ### 1. The "Multi-Divergence" Strategy
 A pure momentum strategy that seeks trend exhaustion on higher timeframes.
-*   **Logic:** Scans for **multiple divergences** in the same direction within a rolling 35-candle window, on **H1, H2, H4, H8, H12, D1**.
+*   **Logic:** Scans for **multiple divergences** in the same direction within a rolling 35-candle window, on **M15, M30, H1, H2, H4, H8, H12, D1**.
 *   **Trigger:** A divergence stack (double or more) fires an alert. On **H12 and D1 a single divergence is already sufficient** — at that scale the HTF context carries the signal on its own.
 *   **Alert Metadata:** Signal strength is classified by divergence count (`x1`, `x2`, `x3` …) to prioritize stronger reversal signals.
 
@@ -105,7 +105,7 @@ divergence. Implemented and covered by tests, but switched off in both profiles.
 
 The system relies on **proprietary algorithms** developed in **Pine Script** (hosted on TradingView). Unlike generic parsers, the backend is tuned to process specific, pre-validated payloads containing rich metadata (e.g., divergence strength, FVG coordinates) rather than simple trigger alerts. The DTOs in `application/dto/` and the `fromCode` / `fromSignal` / `fromSignalType` mappers define that wire contract.
 
-The engine is **symbol-agnostic** — a symbol is whatever code the alert carries, so adding a market means adding a TradingView alert, not a code change. Timeframes are a closed set: **M1, M3, M5, M15, H1, H2, H4, H8, H12, D1, W1** (H2/H8/H12 added most recently).
+The engine is **symbol-agnostic** — a symbol is whatever code the alert carries, so adding a market means adding a TradingView alert, not a code change. Timeframes are a closed set: **M1, M3, M5, M15, M30, H1, H2, H4, H8, H12, D1, W1** (M30 added most recently).
 
 ### 🔁 Backtesting
 
