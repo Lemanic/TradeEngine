@@ -13,6 +13,7 @@ import pl.tradeengine.domain.model.DivergenceSignal;
 import pl.tradeengine.domain.model.FvgKind;
 import pl.tradeengine.domain.model.FvgStatus;
 import pl.tradeengine.domain.model.FvgZone;
+import pl.tradeengine.domain.model.PriceCandle;
 import pl.tradeengine.domain.model.fill.TradeFill;
 import pl.tradeengine.domain.model.Symbol;
 import pl.tradeengine.domain.model.Timeframe;
@@ -83,6 +84,12 @@ public final class TestFixtures {
 
     public static DivergenceSignal divergence(Timeframe tf, Direction direction, ZonedDateTime detectedAt) {
         return new DivergenceSignal(null, BTC, tf, direction, 1.0, detectedAt);
+    }
+
+    /** A BTC candle opening at {@code openTime}; close time follows from the timeframe. */
+    public static PriceCandle candle(Timeframe tf, ZonedDateTime openTime, double open, double high, double low, double close) {
+        return new PriceCandle(BTC, tf, openTime, openTime.plus(tf.getDuration()),
+                BigDecimal.valueOf(open), BigDecimal.valueOf(high), BigDecimal.valueOf(low), BigDecimal.valueOf(close));
     }
 
     /** PriceUpdateDto with BTC/H1 defaults — most handlePriceUpdate tests only care about high/low/close. */
