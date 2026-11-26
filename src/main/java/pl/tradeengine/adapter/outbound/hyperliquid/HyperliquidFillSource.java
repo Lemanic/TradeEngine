@@ -3,6 +3,8 @@ package pl.tradeengine.adapter.outbound.hyperliquid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import pl.tradeengine.adapter.outbound.hyperliquid.HyperliquidResponses.Fill;
+import pl.tradeengine.adapter.outbound.hyperliquid.HyperliquidResponses.OrderDetails;
+import pl.tradeengine.adapter.outbound.hyperliquid.HyperliquidResponses.OrderStatus;
 import pl.tradeengine.domain.model.fill.TradeFill;
 import pl.tradeengine.domain.port.fill.TradeFillSource;
 
@@ -10,6 +12,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +22,7 @@ import java.util.stream.Collectors;
  * Zrealizowane zlecenia jednego adresu na Hyperliquid — spot i perpy z jednego zapytania
  * {@code userFillsByTime}.
  *
- * <p>Trzy rzeczy, których nie widać w API:
+ * <p>Cztery rzeczy, których nie widać w API:
  * <ul>
  *   <li><b>Spot ma inny {@code coin} niż perp</b> — zamiast tickera przychodzi indeks rynku
  *       ({@code "@107"}) albo nazwa pary ({@code "PURR/USDC"}). Do wiadomości idzie ticker
@@ -32,6 +35,15 @@ import java.util.stream.Collectors;
  *   <li><b>Fill bez {@code tid} albo {@code time} jest bezużyteczny</b> — bez nich nie da się go
  *       zapamiętać jako obsłużonego, więc alert o nim wracałby w każdym przebiegu. Takie wiersze
  *       są pomijane z ostrzeżeniem.</li>
+ *   <li><b>Fill nie mówi, jakim zleceniem powstał.</b> Pole {@code crossed} (taker) nie wystarcza:
+ *       TP i SL to też markety po stronie takera, a limit złożony po drugiej stronie księgi
+ *       realizuje się od razu jako taker. Dlatego o każdy fill pytamy {@code orderStatus} i za
+ *       ręczne uznajemy tylko {@code orderType = Market} z {@code tif = FrontendMarket} — to jest
+ *       kliknięcie w interfejsie, perp albo spot, otwarcie albo zamknięcie. TP i SL mają
+ *       {@code Stop Market}/{@code Take Profit Market}, a market złożony przez API (bot) inne
+ *       {@code tif}, więc alert dostają. Likwidacji nie sprawdzamy wcale — jej alert nie może
+ *       zależeć od tego, co odpowie giełda. Gdy {@code orderStatus} nie odpowie, alert idzie
+ *       normalnie: zbędna wiadomość jest lepsza niż przegapiony limit.</li>
  * </ul>
  */
 public class HyperliquidFillSource implements TradeFillSource {
@@ -39,6 +51,9 @@ public class HyperliquidFillSource implements TradeFillSource {
     private static final Logger log = LoggerFactory.getLogger(HyperliquidFillSource.class);
 
     private static final String BUY_SIDE = "B";
+    private static final String LIQUIDATION_DIR_MARKER = "Liquidat";
+    private static final String MARKET_ORDER_TYPE = "Market";
+    private static final String FRONTEND_TIF = "FrontendMarket";
 
     private final String baseUrl;
     private final String address;
@@ -63,6 +78,8 @@ public class HyperliquidFillSource implements TradeFillSource {
     public List<TradeFill> fillsSince(Instant since) {
         Fill[] fills = client.userFillsByTime(baseUrl, address, since.toEpochMilli());
 
+        // Jedno zlecenie market potrafi zrealizowac sie w kilku fillach — pytamy raz na oid.
+        Map<Long, Boolean> manualByOid = new HashMap<>();
         List<TradeFill> mapped = new ArrayList<>();
         for (Fill fill : fills) {
             if (!usable(fill)) {
@@ -70,7 +87,7 @@ public class HyperliquidFillSource implements TradeFillSource {
                         fill.tid(), fill.time(), fill.coin());
                 continue;
             }
-            mapped.add(toDomain(fill));
+            mapped.add(toDomain(fill, manualByOid));
         }
         mapped.sort(Comparator.comparing(TradeFill::time).thenComparingLong(TradeFill::tid));
 
@@ -83,7 +100,7 @@ public class HyperliquidFillSource implements TradeFillSource {
                 && fill.px() != null && fill.sz() != null;
     }
 
-    private TradeFill toDomain(Fill fill) {
+    private TradeFill toDomain(Fill fill, Map<Long, Boolean> manualByOid) {
         boolean spot = isSpot(fill.coin());
         return new TradeFill(
                 fill.tid(),
@@ -97,7 +114,32 @@ public class HyperliquidFillSource implements TradeFillSource {
                 fill.closedPnl() == null ? BigDecimal.ZERO : fill.closedPnl(),
                 fill.fee() == null ? BigDecimal.ZERO : fill.fee(),
                 fill.feeToken(),
-                spot);
+                spot,
+                manualMarketOrder(fill, manualByOid));
+    }
+
+    private boolean manualMarketOrder(Fill fill, Map<Long, Boolean> manualByOid) {
+        if (fill.oid() == null
+                || (fill.dir() != null && fill.dir().contains(LIQUIDATION_DIR_MARKER))) {
+            return false;
+        }
+        return manualByOid.computeIfAbsent(fill.oid(), this::isManualMarketOrder);
+    }
+
+    private boolean isManualMarketOrder(long oid) {
+        OrderStatus status;
+        try {
+            status = client.orderStatus(baseUrl, address, oid);
+        } catch (HyperliquidException e) {
+            log.warn("Nie znam typu zlecenia oid={}, alert pojdzie: {}", oid, e.getMessage());
+            return false;
+        }
+        OrderDetails order = status.order() == null ? null : status.order().order();
+        if (order == null) {
+            log.warn("Hyperliquid nie zna zlecenia oid={} ({}), alert pojdzie", oid, status.status());
+            return false;
+        }
+        return MARKET_ORDER_TYPE.equals(order.orderType()) && FRONTEND_TIF.equals(order.tif());
     }
 
     /** Rynek spot zapisany jest indeksem ({@code "@107"}) albo parą ({@code "PURR/USDC"}). */

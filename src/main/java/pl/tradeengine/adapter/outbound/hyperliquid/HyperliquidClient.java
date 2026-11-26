@@ -7,6 +7,7 @@ import org.springframework.web.client.RestClientException;
 import pl.tradeengine.adapter.outbound.hyperliquid.HyperliquidResponses.ClearinghouseState;
 import pl.tradeengine.adapter.outbound.hyperliquid.HyperliquidResponses.DelegatorSummary;
 import pl.tradeengine.adapter.outbound.hyperliquid.HyperliquidResponses.Fill;
+import pl.tradeengine.adapter.outbound.hyperliquid.HyperliquidResponses.OrderStatus;
 import pl.tradeengine.adapter.outbound.hyperliquid.HyperliquidResponses.SpotClearinghouseState;
 import pl.tradeengine.adapter.outbound.hyperliquid.HyperliquidResponses.SpotMeta;
 
@@ -21,7 +22,8 @@ import java.util.Map;
  * deposits and sub-accounts would be a fourth and fifth; this wallet has neither (checked:
  * {@code []} and {@code null}), so they are deliberately not read.
  *
- * <p>The remaining two serve the fill notifications rather than the portfolio: realised fills and
+ * <p>The remaining three serve the fill notifications rather than the portfolio: realised fills,
+ * the order behind a fill (a fill does not say whether it came from a market or a limit order) and
  * the spot market dictionary that turns a fill's {@code "@107"} into a readable ticker.
  */
 public class HyperliquidClient {
@@ -64,6 +66,16 @@ public class HyperliquidClient {
                         "startTime", startTimeMs,
                         "aggregateByTime", false),
                 Fill[].class);
+    }
+
+    /**
+     * Zlecenie, z którego powstał fill. Waży 2 w limicie 1200/min (większość zapytań waży 20),
+     * więc pytanie o każdy nowy fill nie ma znaczenia dla limitów.
+     */
+    public OrderStatus orderStatus(String baseUrl, String address, long oid) {
+        return post(baseUrl, "orderStatus",
+                Map.of("type", "orderStatus", "user", address, "oid", oid),
+                OrderStatus.class);
     }
 
     /** Słownik rynków spot — jedyne, po co go czytamy, to zamiana {@code "@107"} na tickera. */

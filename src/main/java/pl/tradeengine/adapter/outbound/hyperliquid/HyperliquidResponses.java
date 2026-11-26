@@ -52,6 +52,26 @@ public final class HyperliquidResponses {
                        Long oid) {}
 
     /**
+     * Stan jednego zlecenia z {@code orderStatus}. Fill nie mówi, jakim zleceniem powstał, a tylko
+     * po tym da się odróżnić kliknięty market od limitu, który zrealizował się sam.
+     *
+     * <p>{@code status} to {@code "order"}, gdy zlecenie się znalazło, albo {@code "unknownOid"} —
+     * wtedy {@code order} jest {@code null}. Pole {@code order.order} nie jest pomyłką: API
+     * zagnieżdża szczegóły zlecenia obok jego statusu ({@code "filled"}, {@code "canceled"}).
+     */
+    public record OrderStatus(String status, OrderStatusEntry order) {}
+
+    public record OrderStatusEntry(OrderDetails order, String status) {}
+
+    /**
+     * {@code orderType} to {@code Market}, {@code Limit}, {@code Stop Market},
+     * {@code Take Profit Market} itd. {@code tif} dla zlecenia z interfejsu giełdy to
+     * {@code FrontendMarket}; zlecenie złożone przez API ma {@code Ioc}/{@code Gtc}, a TP/SL
+     * {@code null}.
+     */
+    public record OrderDetails(Long oid, String orderType, String tif) {}
+
+    /**
      * Słownik rynków spot. Potrzebny tylko po to, żeby {@code "@107"} z filla zamienić na
      * czytelnego tickera: {@code universe[].name} równe {@code "@107"} wskazuje przez
      * {@code tokens[0]} na indeks tokena w {@code tokens[]}.

@@ -18,6 +18,11 @@ import java.time.Instant;
  * <p>{@code dir} przepisujemy dosłownie z API ({@code Open Long}, {@code Reduce Short},
  * {@code Buy}, {@code Sell}) — dzięki temu zdarzenie, którego nie przewidzieliśmy (likwidacja)
  * opisze się samo, bez zmian w kodzie.
+ *
+ * <p>{@code manualMarketOrder} oznacza fill ze zlecenia market klikniętego ręcznie w interfejsie
+ * giełdy — otwarcie albo zamknięcie, perp albo spot. O takim właściciel wie, bo sam je przed
+ * chwilą złożył, więc alert o nim nic nie wnosi. Limit, TP, SL i likwidacja zostają
+ * {@code false} — o nich alert jest potrzebny, bo realizują się bez udziału człowieka.
  */
 public record TradeFill(long tid,
                         Instant time,
@@ -30,7 +35,8 @@ public record TradeFill(long tid,
                         BigDecimal closedPnl,
                         BigDecimal fee,
                         String feeToken,
-                        boolean spot) {
+                        boolean spot,
+                        boolean manualMarketOrder) {
 
     public enum Side { BUY, SELL }
 

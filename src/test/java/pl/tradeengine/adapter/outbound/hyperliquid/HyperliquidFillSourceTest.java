@@ -68,6 +68,30 @@ class HyperliquidFillSourceTest {
         respond("userFillsByTime", "[" + fills + "]");
     }
 
+    private void respondOrder(long oid, String orderType, String tif) {
+        server.expect(ExpectedCount.once(), requestTo(BASE_URL + "/info"))
+                .andExpect(jsonPath("$.type").value("orderStatus"))
+                .andExpect(jsonPath("$.user").value(ADDRESS))
+                .andExpect(jsonPath("$.oid").value(oid))
+                .andRespond(withSuccess("""
+                        {"status":"order","order":{"order":{"coin":"BTC","side":"B",
+                          "oid":%d,"orderType":"%s","tif":%s,"isTrigger":false,
+                          "reduceOnly":false},"status":"filled"}}
+                        """.formatted(oid, orderType, tif == null ? "null" : '"' + tif + '"'),
+                        MediaType.APPLICATION_JSON));
+    }
+
+    private static String openLong(long tid, long oid) {
+        return perpFill(tid, oid, "B", "Open Long");
+    }
+
+    private static String perpFill(long tid, long oid, String side, String dir) {
+        return """
+                {"tid":%d,"time":1793620331000,"coin":"BTC","px":"108450.5","sz":"0.01",
+                 "side":"%s","dir":"%s","oid":%d,"crossed":true}
+                """.formatted(tid, side, dir, oid);
+    }
+
     @Test
     void asksForFillsFromTheCursorWithoutAggregating() {
         server.expect(requestTo(BASE_URL + "/info"))
@@ -88,6 +112,7 @@ class HyperliquidFillSourceTest {
                  "side":"B","dir":"Open Long","closedPnl":"0.0","fee":"0.47","feeToken":"USDC",
                  "oid":5551,"hash":"0xabc","startPosition":"0.0","crossed":true}
                 """);
+        respondOrder(5551, "Limit", "Gtc");
 
         TradeFill fill = source.fillsSince(SINCE).getFirst();
 
@@ -204,6 +229,104 @@ class HyperliquidFillSourceTest {
                 """);
 
         assertThat(source.fillsSince(SINCE)).extracting(TradeFill::tid).containsExactly(1L, 2L, 3L);
+    }
+
+    @Test
+    void recognisesAnEntryClickedAtMarketInTheExchangeUi() {
+        respondFills(openLong(910001, 7001));
+        respondOrder(7001, "Market", "FrontendMarket");
+
+        assertThat(source.fillsSince(SINCE).getFirst().manualMarketOrder()).isTrue();
+        server.verify();
+    }
+
+    @Test
+    void aLimitEntryThatFilledAsTakerIsStillALimit() {
+        // crossed=true, a mimo to limit — dlatego decyduje orderType, nie strona ksiegi.
+        respondFills(openLong(910002, 7002));
+        respondOrder(7002, "Limit", "Gtc");
+
+        assertThat(source.fillsSince(SINCE).getFirst().manualMarketOrder()).isFalse();
+    }
+
+    @Test
+    void aMarketEntryPlacedThroughTheApiIsNotManual() {
+        respondFills(openLong(910003, 7003));
+        respondOrder(7003, "Market", "Ioc");
+
+        assertThat(source.fillsSince(SINCE).getFirst().manualMarketOrder()).isFalse();
+    }
+
+    @Test
+    void aClosingClickedAtMarketIsManualToo() {
+        respondFills(perpFill(910004, 7004, "A", "Close Long"));
+        respondOrder(7004, "Market", "FrontendMarket");
+
+        assertThat(source.fillsSince(SINCE).getFirst().manualMarketOrder()).isTrue();
+    }
+
+    @Test
+    void aTakeProfitIsNotManualAlthoughItIsAMarketOrder() {
+        // TP i SL to markety po stronie takera, jak klikniecie — odroznia je dopiero orderType.
+        respondFills(perpFill(910009, 7009, "A", "Close Long"));
+        respondOrder(7009, "Take Profit Market", null);
+
+        assertThat(source.fillsSince(SINCE).getFirst().manualMarketOrder()).isFalse();
+    }
+
+    @Test
+    void aSpotTradeClickedAtMarketIsManual() {
+        respondFills("""
+                {"tid":910010,"time":1793620331000,"coin":"PURR/USDC","px":"0.21","sz":"100",
+                 "side":"B","dir":"Buy","oid":7010,"crossed":true}
+                """);
+        respondOrder(7010, "Market", "FrontendMarket");
+
+        TradeFill fill = source.fillsSince(SINCE).getFirst();
+
+        assertThat(fill.spot()).isTrue();
+        assertThat(fill.manualMarketOrder()).isTrue();
+    }
+
+    @Test
+    void neverAsksAboutTheOrderBehindALiquidation() {
+        // Alert o likwidacji nie moze zalezec od tego, co odpowie orderStatus.
+        respondFills(perpFill(910011, 7011, "A", "Liquidated Isolated Long"));
+
+        assertThat(source.fillsSince(SINCE).getFirst().manualMarketOrder()).isFalse();
+        server.verify();
+    }
+
+    @Test
+    void asksOncePerOrderThatFilledInSeveralPieces() {
+        respondFills(openLong(910005, 7005) + "," + openLong(910006, 7005));
+        respondOrder(7005, "Market", "FrontendMarket");
+
+        assertThat(source.fillsSince(SINCE))
+                .extracting(TradeFill::manualMarketOrder)
+                .containsExactly(true, true);
+        server.verify();
+    }
+
+    @Test
+    void alertsAboutTheEntryWhenTheOrderCannotBeRead() {
+        respondFills(openLong(910007, 7007));
+        server.expect(ExpectedCount.once(), requestTo(BASE_URL + "/info"))
+                .andExpect(jsonPath("$.type").value("orderStatus"))
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+
+        // Zbedna wiadomosc jest lepsza niz przegapiony limit.
+        assertThat(source.fillsSince(SINCE).getFirst().manualMarketOrder()).isFalse();
+    }
+
+    @Test
+    void alertsAboutTheEntryWhenTheExchangeDoesNotKnowTheOrder() {
+        respondFills(openLong(910008, 7008));
+        respond("orderStatus", """
+                {"status":"unknownOid"}
+                """);
+
+        assertThat(source.fillsSince(SINCE).getFirst().manualMarketOrder()).isFalse();
     }
 
     @Test
