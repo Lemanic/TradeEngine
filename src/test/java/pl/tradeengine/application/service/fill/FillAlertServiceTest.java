@@ -125,6 +125,39 @@ class FillAlertServiceTest {
     }
 
     @Test
+    void staysSilentAboutAManualMarketOrderButRemembersIt() {
+        repository.seed(TestFixtures.tradeFill(100, NOW.minus(Duration.ofHours(6))));
+        source.returns(
+                TestFixtures.manualMarketOrder(1, NOW.minus(Duration.ofMinutes(20))),
+                TestFixtures.tradeFill(2, NOW.minus(Duration.ofMinutes(10))));
+
+        service(10).pollAndNotify();
+
+        // Kliknietego marketu wlasciciel nie musi poznawac z telefonu; limit, TP i SL realizuja
+        // sie bez niego.
+        assertThat(publisher.sent()).hasSize(1);
+        assertThat(publisher.sent().getFirst()).contains("14:50 UTC");
+        // Zapamietane mimo braku wiadomosci — inaczej wracaloby w kazdym przebiegu.
+        assertThat(repository.seenTids()).containsExactlyInAnyOrder(100L, 1L, 2L);
+    }
+
+    @Test
+    void aManualMarketOrderDoesNotUseUpTheMessageLimit() {
+        repository.seed(TestFixtures.tradeFill(100, NOW.minus(Duration.ofHours(6))));
+        source.returns(
+                TestFixtures.manualMarketOrder(1, NOW.minus(Duration.ofMinutes(30))),
+                TestFixtures.manualMarketOrder(2, NOW.minus(Duration.ofMinutes(25))),
+                TestFixtures.tradeFill(3, NOW.minus(Duration.ofMinutes(20))),
+                TestFixtures.tradeFill(4, NOW.minus(Duration.ofMinutes(10))));
+
+        service(2).pollAndNotify();
+
+        // Dwa alerty w limicie 2 i zadnej linii o pominietych.
+        assertThat(publisher.sent()).hasSize(2);
+        assertThat(publisher.sent()).noneMatch(message -> message.contains("pominięto"));
+    }
+
+    @Test
     void aFailingSourceStoresNothingAndAlertsNobody() {
         repository.seed(TestFixtures.tradeFill(1, NOW.minus(Duration.ofHours(2))));
         source.fails(new HyperliquidException("Hyperliquid is unreachable for userFillsByTime"));

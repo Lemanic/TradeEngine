@@ -149,7 +149,14 @@ public final class TestFixtures {
     public static TradeFill tradeFill(long tid, Instant time) {
         return new TradeFill(tid, time, "BTC", "BTC", TradeFill.Side.BUY, "Open Long",
                 new BigDecimal("0.01"), new BigDecimal("100000"), BigDecimal.ZERO,
-                new BigDecimal("0.5"), "USDC", false);
+                new BigDecimal("0.5"), "USDC", false, false);
+    }
+
+    /** Fill z marketu kliknietego w interfejsie gieldy — o takim alert nie idzie. */
+    public static TradeFill manualMarketOrder(long tid, Instant time) {
+        return new TradeFill(tid, time, "BTC", "BTC", TradeFill.Side.BUY, "Open Long",
+                new BigDecimal("0.01"), new BigDecimal("100000"), BigDecimal.ZERO,
+                new BigDecimal("0.5"), "USDC", false, true);
     }
 
     /** Jeden wpis z app.strategies, skladany recznie zamiast ladowania YAML-a. */

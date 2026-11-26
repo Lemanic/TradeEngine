@@ -31,6 +31,10 @@ import java.util.Optional;
  *       linię podsumowania — lepiej stracić szczegół niż zalać kanał.</li>
  * </ul>
  *
+ * <p>Fill z marketu klikniętego ręcznie ({@link TradeFill#manualMarketOrder()}) nie dostaje
+ * wiadomości — właściciel sam go właśnie kliknął. Zapisujemy je jako obsłużone jak każdy inny fill i nie
+ * liczymy do limitu wiadomości.
+ *
  * <p>Fill jest zapisywany jako obsłużony także wtedy, gdy wiadomość o nim nie poszła z powodu
  * limitu. Dlatego wysyłka nie może wyrzucać wyjątków — kontrakt {@link NotificationPublisher}
  * tego pilnuje, inaczej jeden błąd sieci powtarzałby alert w nieskończoność.
@@ -94,21 +98,25 @@ public class FillAlertService {
         }
 
         int sent = 0;
+        int silenced = 0;
         for (TradeFill fill : fills) {
-            if (sent < maxMessagesPerRun) {
+            if (fill.manualMarketOrder()) {
+                silenced++;
+            } else if (sent < maxMessagesPerRun) {
                 publisher.send(FillMessageFormatter.format(fill));
                 sent++;
             }
             repository.markSeen(fill, now);
         }
 
-        int skipped = fills.size() - sent;
+        int skipped = fills.size() - silenced - sent;
         if (skipped > 0) {
             log.warn("Zalegosci: {} fill(ow) ponad limit {} wiadomosci na przebieg",
                     skipped, maxMessagesPerRun);
             publisher.send(FillMessageFormatter.skipped(skipped, maxMessagesPerRun));
         }
-        log.info("Powiadomiono o {} fill(ach), pominieto {}", sent, skipped);
+        log.info("Powiadomiono o {} fill(ach), pominieto {}, recznych marketow {}",
+                sent, skipped, silenced);
     }
 
     private void prune(Instant now) {

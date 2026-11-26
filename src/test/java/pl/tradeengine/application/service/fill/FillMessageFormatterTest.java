@@ -18,7 +18,7 @@ class FillMessageFormatterTest {
     void describesOpeningAPerpPosition() {
         TradeFill fill = new TradeFill(1L, TIME, "BTC", "BTC", TradeFill.Side.BUY, "Open Long",
                 new BigDecimal("0.0123"), new BigDecimal("108450.5"), BigDecimal.ZERO,
-                new BigDecimal("0.47"), "USDC", false);
+                new BigDecimal("0.47"), "USDC", false, false);
 
         assertThat(FillMessageFormatter.format(fill)).isEqualTo("""
                 🟢 HYPERLIQUID · Open Long
@@ -32,7 +32,7 @@ class FillMessageFormatterTest {
     void showsRealisedPnlWhenAPositionIsReduced() {
         TradeFill fill = new TradeFill(2L, TIME, "BTC", "BTC", TradeFill.Side.SELL, "Reduce Long",
                 new BigDecimal("0.0123"), new BigDecimal("109000"), new BigDecimal("6.73"),
-                BigDecimal.ZERO, "USDC", false);
+                BigDecimal.ZERO, "USDC", false, false);
 
         assertThat(FillMessageFormatter.format(fill)).isEqualTo("""
                 🔴 HYPERLIQUID · Reduce Long
@@ -46,7 +46,7 @@ class FillMessageFormatterTest {
     void marksSpotAndKeepsSmallPricesIntact() {
         TradeFill fill = new TradeFill(3L, TIME, "@107", "PENGU", TradeFill.Side.BUY, "Buy",
                 new BigDecimal("1000"), new BigDecimal("0.0121"), BigDecimal.ZERO,
-                BigDecimal.ZERO, null, true);
+                BigDecimal.ZERO, null, true, false);
 
         assertThat(FillMessageFormatter.format(fill)).isEqualTo("""
                 🟢 HYPERLIQUID · Buy (spot)
@@ -59,7 +59,7 @@ class FillMessageFormatterTest {
     void keepsTheMinusOnALoss() {
         TradeFill fill = new TradeFill(4L, TIME, "ETH", "ETH", TradeFill.Side.SELL, "Reduce Short",
                 new BigDecimal("1"), new BigDecimal("3000"), new BigDecimal("-12.5"),
-                new BigDecimal("1.2"), "USDC", false);
+                new BigDecimal("1.2"), "USDC", false, false);
 
         assertThat(FillMessageFormatter.format(fill))
                 .contains("PnL: -12.50 USDC")
@@ -70,7 +70,7 @@ class FillMessageFormatterTest {
     void fallsBackToTheSideWhenTheApiSendsNoDirection() {
         TradeFill fill = new TradeFill(5L, TIME, "kPEPE", "kPEPE", TradeFill.Side.SELL, null,
                 new BigDecimal("10"), new BigDecimal("0.5"), BigDecimal.ZERO,
-                BigDecimal.ZERO, null, false);
+                BigDecimal.ZERO, null, false, false);
 
         assertThat(FillMessageFormatter.format(fill)).startsWith("🔴 HYPERLIQUID · Sell\nkPEPE");
     }
@@ -80,7 +80,7 @@ class FillMessageFormatterTest {
         // Likwidacja nie ma w kodzie zadnej galezi — opisuje sie sama przez dir z API.
         TradeFill fill = new TradeFill(6L, TIME, "BTC", "BTC", TradeFill.Side.SELL,
                 "Liquidated Isolated Long", new BigDecimal("0.5"), new BigDecimal("95000"),
-                new BigDecimal("-480.25"), BigDecimal.ZERO, "USDC", false);
+                new BigDecimal("-480.25"), BigDecimal.ZERO, "USDC", false, false);
 
         assertThat(FillMessageFormatter.format(fill))
                 .startsWith("🔴 HYPERLIQUID · Liquidated Isolated Long")
