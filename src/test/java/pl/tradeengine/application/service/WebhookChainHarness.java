@@ -17,7 +17,7 @@ import java.util.List;
 /**
  * Sklada prawdziwy lancuch produkcyjny bez Springa:
  * {@code WebhookProcessingService -> ScenarioEngine -> ScenarioRegistry -> RecordingScenario}
- * oraz {@code AlertDispatchService -> FakeAlertPublisher}.
+ * oraz {@code AlertDispatchService (+ InMemoryAlertMuteRepository) -> FakeAlertPublisher}.
  *
  * <p>Po co, skoro istniejacy WebhookProcessingServiceHandlePriceUpdateTest mockuje ScenarioEngine:
  * mock zaslepiony przez {@code any()} nie mowi nic o tym, <b>ktore</b> zdarzenie serwis wyemitowal,
@@ -37,6 +37,7 @@ public final class WebhookChainHarness {
     public final InMemoryDivergenceRepository divergenceRepo = new InMemoryDivergenceRepository();
     public final RecordingBiasRepositoryFake biasRepo = new RecordingBiasRepositoryFake();
     public final StatefulSwingPointRepositoryFake swingRepo = new StatefulSwingPointRepositoryFake();
+    public final InMemoryAlertMuteRepository muteRepo = new InMemoryAlertMuteRepository();
     public final WebhookProcessingService service;
 
     private WebhookChainHarness(List<AlertToSend> alertsFromScenario) {
@@ -50,7 +51,7 @@ public final class WebhookChainHarness {
 
         this.service = new WebhookProcessingService(
                 new ScenarioEngine(registry),
-                new AlertDispatchService(publisher),
+                new AlertDispatchService(publisher, muteRepo),
                 fvgRepo, divergenceRepo, biasRepo, swingRepo);
     }
 
@@ -70,5 +71,6 @@ public final class WebhookChainHarness {
         publisher.clear();
         biasRepo.clear();
         swingRepo.clear();
+        muteRepo.clear();
     }
 }
