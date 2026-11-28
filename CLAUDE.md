@@ -67,7 +67,8 @@ delete by accident:
 - Use `InMemory*Repository` adapters (already exist in `backtest/`) as fakes — **do not mock repositories**
 - **`Mockito.verify` is not used anywhere in this suite.** To assert what a collaborator received,
   write a fake that records it. The ones that exist, all in `src/test/java/pl/tradeengine/`:
-  `FakeAlertPublisher` (records published lists), `RecordingScenario` (records every `DomainEvent`
+  `FakeAlertPublisher` (records published lists), `InMemoryAlertMuteRepository` and
+  `FakeSeenSymbols` (alert mutes, in `application/service/`), `RecordingScenario` (records every `DomainEvent`
   it saw), `RecordingBiasRepositoryFake` (keeps `reason`, which `InMemoryBiasRepository` logs and
   drops), `StatefulFvgRepositoryFake` and `StatefulSwingPointRepositoryFake`.
 - `application/service/WebhookChainHarness` assembles the real production chain without Spring:
@@ -165,6 +166,36 @@ FVG status transitions (`CREATED → TOUCHED → FILLED → CONSUMED`) and the `
 ### Webhook payloads come from TradingView Pine Script
 
 The DTOs in `application/dto/` are tuned for specific Pine Script payloads, not generic alerts. The `Symbol`, `Timeframe`, `Direction`, `FvgKind` mappers (`fromCode` / `fromSignal` / `fromSignalType`) define the wire contract.
+
+### Alert mutes (runtime, per strategy and pair)
+
+YAML still decides which strategies exist and on which timeframes; on top of it, rules in the
+`alert_mute` table silence a `(strategy, symbol)` pair — optionally a single timeframe — without a
+restart. Driven from the dashboard through `/api/strategies` (`adapter.inbound.StrategyController`
+→ `application.service.AlertMuteService`).
+
+- **Filtering happens in `AlertDispatchService`, on the way out.** Scenarios still receive every
+  event and still produce the alert; only delivery is dropped (logged as `🔇 MUTED`). That is
+  deliberate: a strategy that stopped seeing events would resume on a broken context after
+  unmuting. It also means the filter keys on `AlertToSend.scenarioName`, so a scenario that put
+  something other than its `name()` there could not be muted.
+- **Rules are read from the database on every dispatch that carries alerts**, not cached — alerts
+  are rare and there is nothing to invalidate. If the read fails, everything is sent: a redundant
+  alert beats a silenced application.
+- **A rule is matched exactly.** `TAO` does not mute `TAOUSDT`, no case folding. A `null`
+  timeframe means every timeframe, and the two kinds are separate rules: lifting an H1 rule leaves
+  an all-timeframes rule in place. Only strategies listed in `app.strategies` can be muted (404
+  otherwise), disabled ones included, so a rule is ready when the strategy is switched on.
+- **The list of pairs comes from the data**, because `Symbol` is a free string: every symbol seen
+  in `divergence_signal`, `swing_point`, `market_bias` or a touched `fvg_zone` within 30 days, plus
+  every muted one. `fvg_zone` has no creation time, so a pair that only ever sends untouched FVGs
+  is not listed — it can still be muted through the API by name.
+- `mute_key` (`strategy|symbol|timeframe`, `*` for all) is the primary key, because `UNIQUE` on
+  three columns treats the all-timeframes `NULL` as distinct and would store the same rule twice.
+- **No backtest path**: `BacktestApplication` never goes through `AlertDispatchService`.
+- **No roles yet**: everyone behind Cloudflare Access on the portfolio host can change mutes.
+
+Prod runs `ddl-auto: validate`, so run `sql/alert_mute_schema.sql` **before** deploying the jar.
 
 ## Portfolio module
 
